@@ -48,6 +48,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<String> {
 			break;
 		case "kill":
 			kill(topic);
+			break;
 		default:
 			System.out.println("received unknown action " + action);
 			break;
