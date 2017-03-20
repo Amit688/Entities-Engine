@@ -1,50 +1,100 @@
 package org.z.entities.engine;
 
-import akka.Done;
-import akka.NotUsed;
-import akka.japi.Pair;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.z.entities.engine.data.Coordinate;
+import org.z.entities.engine.data.EntityReport;
+
+import akka.actor.ActorSystem;
+import akka.kafka.ConsumerSettings;
+import akka.kafka.Subscriptions;
+import akka.kafka.javadsl.Consumer;
 import akka.stream.KillSwitches;
 import akka.stream.Materializer;
 import akka.stream.UniqueKillSwitch;
+import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
-
 /**
  * Created by Amit on 20/03/2017.
  */
-public class EntitiesSupervisor implements Consumer<String> {
-
+public class EntitiesSupervisor implements java.util.function.Consumer<String> {
+    ActorSystem system;
     Materializer materializer;
-    Source<Integer, NotUsed> source;
     Map<String, UniqueKillSwitch> killSwitches;
-    public EntitiesSupervisor(Materializer mat, Source src) {
-        materializer = mat;
-        source = src;
+    
+    public EntitiesSupervisor(ActorSystem system, Materializer materializer) {
+    	this.system = system;
+        this.materializer = materializer;
         killSwitches = new HashMap<>();
-    }
-
-    public void kill(String key) {
-        System.out.println(killSwitches.size());
-        killSwitches.get(key).shutdown();
     }
 
     @Override
     public void accept(String message) {
-        System.out.println("creating flow");
-        Sink<Integer, CompletionStage<Done>> sink = Sink.foreach(t -> {System.out.println("pipe " + message + ": " + t); Thread.sleep(1000);});
-        final Pair<UniqueKillSwitch, CompletionStage<Done>> result = source
-                .viaMat(KillSwitches.single(), Keep.right())
-                .toMat(sink, Keep.both())
-                .run(materializer);
-        System.out.println("adding to HashMap, " + message);
-        killSwitches.put(message, result.first());
-        System.out.println("after adding to HashMap" + killSwitches.size());
+    	String[] parts = message.split(",");
+    	String action = parts[0];
+    	String topic = parts[1];
+    	
+    	switch (action) {
+		case "create":
+			create(topic);
+			break;
+		case "kill":
+			kill(topic);
+		default:
+			System.out.println("received unknown action " + action);
+			break;
+		}
+    }
+    
+    public void kill(String key) {
+    	System.out.println("killing stream with key " + key);
+        killSwitches.remove(key).shutdown();
+        System.out.println("remaining killswitch amount: " + killSwitches.size());
+    }
+    
+    public void create(String topic) {
+    	System.out.println("creating entity manager stream for topic " + topic);
+    	UniqueKillSwitch killSwitch = createSource(topic)
+    		.viaMat(KillSwitches.single(), Keep.right())
+    		.via(Flow.fromFunction(EntitiesSupervisor::convertConsumerRecord))
+    		.via(Flow.fromFunction(new EntityManager()::apply))
+    		.to(Sink.foreach(EntitiesSupervisor::dummySink))
+    		.run(materializer);
+    	
+    	System.out.println("storing killswitch for later use");
+    	killSwitches.put(topic, killSwitch);
+    }
+    
+    private Source<ConsumerRecord<String, String>, Consumer.Control> createSource(String topic) {
+    	return Consumer.plainSource(createConsumerSettings(), 
+				Subscriptions.assignment(new TopicPartition(topic, 0)));
+    }
+    
+    private ConsumerSettings<String, String> createConsumerSettings() {
+    	return ConsumerSettings.create(system, new StringDeserializer(), new StringDeserializer())
+				.withBootstrapServers("localhost:9092")
+				.withGroupId("group1")
+				.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    }
+    
+    private static EntityReport convertConsumerRecord(ConsumerRecord<String, String> record) {
+    	String[] parts = record.value().split(",");
+    	double longitude = Double.parseDouble(parts[0]);
+    	double latitude = Double.parseDouble(parts[1]);
+    	String nationality = parts[3];
+    	return new EntityReport(new Coordinate(longitude, latitude), nationality);
+    }
+    
+    private static void dummySink(EntityReport report) {
+    	System.out.println("wrote report to sink: " + report);
     }
 
 }
