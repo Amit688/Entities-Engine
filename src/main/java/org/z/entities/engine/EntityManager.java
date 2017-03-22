@@ -3,9 +3,10 @@ package org.z.entities.engine;
 import java.util.UUID;
 import java.util.function.Function;
 
-import org.z.entities.engine.data.EntityReport;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
-public class EntityManager implements Function<EntityReport, EntityReport> {
+public class EntityManager implements Function<ConsumerRecord<String, GenericRecord>, GenericRecord> {
 	private UUID uuid;
 	
 	public EntityManager(UUID uuid) {
@@ -13,9 +14,9 @@ public class EntityManager implements Function<EntityReport, EntityReport> {
 	}
 
 	@Override
-	public EntityReport apply(EntityReport arg0) {
+	public GenericRecord apply(ConsumerRecord<String, GenericRecord> record) {
 		System.out.println("processing report for uuid " + uuid);
-		return arg0;
+		return record.value();
 	}
 
 }

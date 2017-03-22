@@ -18,6 +18,7 @@ dependencies {
 	compile 'com.typesafe.akka:akka-stream_2.11:2.4.17'
 	compile group: 'org.apache.kafka', name: 'kafka-streams', version: '0.10.2.0'
 	compile group: "com.typesafe.akka", name: "akka-stream-kafka_2.11", version: "0.14"
+	compile "org.apache.avro:avro:1.8.1"
 
     testCompile 'junit:junit:4.12'
 }
