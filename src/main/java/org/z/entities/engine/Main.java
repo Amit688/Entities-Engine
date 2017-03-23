@@ -1,5 +1,7 @@
 package org.z.entities.engine;
 
+import org.apache.avro.generic.GenericRecord;
+
 import akka.actor.ActorSystem;
 import akka.kafka.javadsl.Consumer;
 import akka.stream.ActorMaterializer;
@@ -19,8 +21,10 @@ public class Main {
 		
 		Source<EntitiesEvent, Consumer.Control> detectionEvents = 
 				KafkaSourceFactory.create(system, "detection")
-				.via(Flow.fromFunction(r -> new EntitiesEvent(EntitiesEvent.Type.CREATE, r.value())));
+				.via(Flow.fromFunction(r -> (GenericRecord) r.value()))
+				.via(Flow.fromFunction(r -> new EntitiesEvent(EntitiesEvent.Type.CREATE, r)));
     	detectionEvents
+    		.alsoTo(Sink.foreach(r -> System.out.println(r)))
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);
 		

@@ -5,8 +5,9 @@ import java.util.function.Function;
 
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
-public class EntityManager implements Function<ConsumerRecord<String, GenericRecord>, GenericRecord> {
+public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, GenericRecord>> {
 	private UUID uuid;
 	
 	public EntityManager(UUID uuid) {
@@ -14,9 +15,9 @@ public class EntityManager implements Function<ConsumerRecord<String, GenericRec
 	}
 
 	@Override
-	public GenericRecord apply(ConsumerRecord<String, GenericRecord> record) {
+	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
 		System.out.println("processing report for uuid " + uuid);
-		return record.value();
+		return new ProducerRecord<String, GenericRecord>("ui", (GenericRecord) record.value());
 	}
 
 }

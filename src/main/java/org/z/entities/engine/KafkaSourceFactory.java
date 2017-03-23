@@ -1,6 +1,5 @@
 package org.z.entities.engine;
 
-import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
@@ -12,6 +11,7 @@ import akka.kafka.ConsumerSettings;
 import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
 import akka.stream.javadsl.Source;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 
 public class KafkaSourceFactory {
 	public static Source<ConsumerRecord<String, byte[]>, Consumer.Control> createRaw(ActorSystem system, String topic) {
@@ -24,9 +24,9 @@ public class KafkaSourceFactory {
     				Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
-	public static Source<ConsumerRecord<String, GenericRecord>, Consumer.Control> create(ActorSystem system, String topic) {
-        ConsumerSettings<String, GenericRecord> consumerSettings = 
-    			ConsumerSettings.create(system, new StringDeserializer(), new GenericRecordDeserializer())
+	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, String topic) {
+        ConsumerSettings<String, Object> consumerSettings = 
+    			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer())
     			.withBootstrapServers("localhost:9092")
     			.withGroupId("group1")
     			.withProperty("schema.registry.url", "https://schema-registry-ui.landoop.com")
@@ -35,7 +35,7 @@ public class KafkaSourceFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
-	public static Source<ConsumerRecord<String, GenericRecord>, Consumer.Control> create(ActorSystem system, TopicDescriptor descriptor) {
+	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, TopicDescriptor descriptor) {
 		return create(system, descriptor.getSensorId() + "." + descriptor.getReportsId());
 	}
 }

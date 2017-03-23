@@ -4,7 +4,9 @@ import org.apache.avro.generic.GenericRecord;
 
 class EntitiesEvent {
 	static enum Type {
-		CREATE
+		CREATE,
+		MERGE,
+		SPLIT
 	}
 	
 	public EntitiesEvent.Type type;
