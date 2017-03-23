@@ -3,7 +3,6 @@ package org.z.entities.engine;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 import akka.actor.ActorSystem;
@@ -14,17 +13,7 @@ import akka.stream.javadsl.Source;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 
 public class KafkaSourceFactory {
-	public static Source<ConsumerRecord<String, byte[]>, Consumer.Control> createRaw(ActorSystem system, String topic) {
-		ConsumerSettings<String, byte[]> consumerSettings = 
-    			ConsumerSettings.create(system, new StringDeserializer(), new ByteArrayDeserializer())
-    			.withBootstrapServers("localhost:9092")
-    			.withGroupId("group1")
-    			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        return Consumer.plainSource(consumerSettings, 
-    				Subscriptions.assignment(new TopicPartition(topic, 0)));
-	}
-	
-	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, String topic) {
+	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, String topic) {
         ConsumerSettings<String, Object> consumerSettings = 
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer())
     			.withBootstrapServers("localhost:9092")
@@ -35,7 +24,7 @@ public class KafkaSourceFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
-	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, TopicDescriptor descriptor) {
+	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, TopicDescriptor descriptor) {
 		return create(system, descriptor.getSensorId() + "." + descriptor.getReportsId());
 	}
 }

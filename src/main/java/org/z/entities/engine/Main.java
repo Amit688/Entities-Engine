@@ -2,10 +2,15 @@ package org.z.entities.engine;
 
 import org.apache.avro.generic.GenericRecord;
 
+import akka.NotUsed;
 import akka.actor.ActorSystem;
-import akka.kafka.javadsl.Consumer;
 import akka.stream.ActorMaterializer;
+import akka.stream.SourceShape;
+import akka.stream.UniformFanInShape;
 import akka.stream.javadsl.Flow;
+import akka.stream.javadsl.GraphDSL;
+import akka.stream.javadsl.GraphDSL.Builder;
+import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 
@@ -19,11 +24,18 @@ public class Main {
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		EntitiesSupervisor supervisor = new EntitiesSupervisor(system, materializer);
 		
-		Source<EntitiesEvent, Consumer.Control> detectionEvents = 
-				KafkaSourceFactory.create(system, "detection")
-				.via(Flow.fromFunction(r -> (GenericRecord) r.value()))
-				.via(Flow.fromFunction(r -> new EntitiesEvent(EntitiesEvent.Type.CREATE, r)));
-    	detectionEvents
+		Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "detection", EntitiesEvent.Type.CREATE);
+		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(system, "merge", EntitiesEvent.Type.MERGE);
+		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(system, "split", EntitiesEvent.Type.SPLIT);
+		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
+			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
+			directToMerger(builder, detectionsSource, merger);
+			directToMerger(builder, mergesSource, merger);
+			directToMerger(builder, splitsSource, merger);
+			return SourceShape.of(merger.out());
+		}));
+		
+		combinedSource
     		.alsoTo(Sink.foreach(r -> System.out.println(r)))
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);
@@ -37,5 +49,15 @@ public class Main {
 		while(true) {
 			Thread.sleep(3000);
 		}
+    }
+    
+    private static Source<EntitiesEvent, ?> createSourceWithType(ActorSystem system, String topic, EntitiesEvent.Type type) {
+    	return KafkaSourceFactory.create(system, topic)
+    			.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
+    }
+    
+    private static void directToMerger(Builder<NotUsed> builder, 
+    		Source<EntitiesEvent, ?> source, UniformFanInShape<EntitiesEvent, ?> merger) {
+    	builder.from(builder.add(source).out()).toFanIn(merger);
     }
 }
