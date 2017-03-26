@@ -13,7 +13,7 @@ import akka.stream.javadsl.Source;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 
 public class KafkaSourceFactory {
-	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, String topic) {
+	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, String topic) {
         ConsumerSettings<String, Object> consumerSettings = 
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer())
     			.withBootstrapServers("localhost:9092")
@@ -24,7 +24,8 @@ public class KafkaSourceFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
-	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, SourceDescriptor descriptor) {
+	public static Source<ConsumerRecord<String, Object>, Consumer.Control> create(ActorSystem system, SourceDescriptor descriptor) {
+		//TODO- how to create topic string from source descriptor
 		return create(system, descriptor.getSensorId() + "." + descriptor.getReportsId());
 	}
 }

@@ -20,40 +20,40 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	private UUID uuid;
 	private Map<SourceDescriptor, GenericRecord> sons;
-	private GenericRecord preferredSon;
+	private SourceDescriptor preferredSource;
 	
 	public EntityManager(UUID uuid) {
 		this.uuid = uuid;
 		sons = new HashMap<>();
-		preferredSon = null;
+		preferredSource = null;
 	}
 
 	@Override
 	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
 		System.out.println("processing report for uuid " + uuid);
 		GenericRecord data = (GenericRecord) record.value();
-		SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
-		preferredSon = data;
+		SourceDescriptor sourceDescriptor = getSourceDescriptor(record);
+		preferredSource = sourceDescriptor;
 		sons.put(sourceDescriptor, data);
 		
 		GenericRecord guiUpdate = createUpdate();
 		return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
 	}
 	
-	private SourceDescriptor getSourceDescriptor(GenericRecord data) {
+	private SourceDescriptor getSourceDescriptor(ConsumerRecord<String, Object> record) {
 		//TODO
 		return null;
 	}
 	
 	private GenericRecord createUpdate() {
-		//TODO- verify field meanings
+		//TODO- verify meaning of entityID
 		List<GenericRecord> sonsRecords = new ArrayList<>();
 		for (GenericRecord son : sons.values()) {
 			sonsRecords.add(createSingleEntityUpdate(son));
 		}
 		GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
 				.set("entityID", uuid.toString())
-				.set("entityAttributes", preferredSon)
+				.set("entityAttributes", sons.get(preferredSource))
 				.set("sons", sonsRecords)
 				.build();
 		return family;

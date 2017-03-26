@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 
 import akka.NotUsed;
 import akka.actor.ActorSystem;
+import akka.kafka.javadsl.Consumer;
 import akka.stream.KillSwitches;
 import akka.stream.Materializer;
 import akka.stream.Outlet;
@@ -46,24 +48,25 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     @Override
     public void accept(EntitiesEvent event) {
     	try {
-	    	switch (event.type) {
+    		GenericRecord data = event.getData();
+	    	switch (event.getType()) {
 			case CREATE:
-				create(event.data);
+				create(data);
 				break;
 			case MERGE:
-				merge(event.data);
+				merge(data);
 				break;
 			case SPLIT:
-				split(event.data);
+				split(data);
 				break;
 			default:
-				System.out.println("received unknown event type: " + event.type);
-				System.out.println("event data: " + event.data);
+				System.out.println("received unknown event type: " + Objects.toString(event.getType()));
+				System.out.println("event data: " + Objects.toString(event.getData()));
 				break;
 	    	}
     	} catch (RuntimeException e) {
-    		System.out.println("failed to process event of type " + event.type);
-    		System.out.println("event data: " + event.data);
+    		System.out.println("failed to process event of type " + Objects.toString(event.getType()));
+    		System.out.println("event data: " + Objects.toString(event.getData()));
     		e.printStackTrace();
     	}
     }
@@ -82,12 +85,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	List<UUID> uuidsToMerge = toUUIDs(idsToMerge);
     	
     	if (streams.keySet().containsAll(uuidsToMerge)) {
-    		List<SourceDescriptor> sourceDescriptorsToMerge = new ArrayList<>(uuidsToMerge.size());
-    		for (UUID uuid : uuidsToMerge) {
-    			StreamDescriptor stream = streams.remove(uuid);
-    			stream.getKillSwitch().shutdown();
-    			sourceDescriptorsToMerge.addAll(stream.getSourceDescriptors());
-    		}
+    		List<SourceDescriptor> sourceDescriptorsToMerge = killAndFlattenSources(uuidsToMerge);
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sourceDescriptorsToMerge)));
     		createStream(mergedSource, sourceDescriptorsToMerge);
@@ -106,12 +104,23 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	return uuids;
     }
 	
+	private List<SourceDescriptor> killAndFlattenSources(List<UUID> uuidsToKill) {
+		List<SourceDescriptor> sources = new ArrayList<>(streams.size());
+		for (UUID uuid : uuidsToKill) {
+			StreamDescriptor stream = streams.remove(uuid);
+			stream.getKillSwitch().shutdown();
+			sources.addAll(stream.getSourceDescriptors());
+		}
+		return sources;
+	}
+	
 	private SourceShape<ConsumerRecord<String, Object>> createMergedSourceGraph(
-			Builder<NotUsed> builder, List<SourceDescriptor> sourceDescriptorsToMerge) {
+			Builder<NotUsed> builder, List<SourceDescriptor> sourceDescriptors) {
 		UniformFanInShape<ConsumerRecord<String, Object>, ConsumerRecord<String, Object>> merger = 
-				builder.add(Merge.create(sourceDescriptorsToMerge.size()));
-		for (SourceDescriptor sourceDescriptor : sourceDescriptorsToMerge) {
-			Source<ConsumerRecord<String, Object>, ?> source = KafkaSourceFactory.create(system, sourceDescriptor);
+				builder.add(Merge.create(sourceDescriptors.size()));
+		
+		for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = KafkaSourceFactory.create(system, sourceDescriptor);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}

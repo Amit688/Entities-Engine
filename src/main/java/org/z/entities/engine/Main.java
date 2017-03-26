@@ -22,23 +22,7 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(system, materializer);
-		
-		Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "detection", EntitiesEvent.Type.CREATE);
-		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(system, "merge", EntitiesEvent.Type.MERGE);
-		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(system, "split", EntitiesEvent.Type.SPLIT);
-		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
-			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
-			directToMerger(builder, detectionsSource, merger);
-			directToMerger(builder, mergesSource, merger);
-			directToMerger(builder, splitsSource, merger);
-			return SourceShape.of(merger.out());
-		}));
-		
-		combinedSource
-    		.alsoTo(Sink.foreach(r -> System.out.println(r)))
-    		.to(Sink.foreach(supervisor::accept))
-    		.run(materializer);
+		createSupervisorStream(system, materializer);
 		
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -49,6 +33,25 @@ public class Main {
 		while(true) {
 			Thread.sleep(3000);
 		}
+    }
+    
+    private static void createSupervisorStream(ActorSystem system, ActorMaterializer materializer) {
+    	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "detection", EntitiesEvent.Type.CREATE);
+		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(system, "merge", EntitiesEvent.Type.MERGE);
+		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(system, "split", EntitiesEvent.Type.SPLIT);
+		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
+			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
+			directToMerger(builder, detectionsSource, merger);
+			directToMerger(builder, mergesSource, merger);
+			directToMerger(builder, splitsSource, merger);
+			return SourceShape.of(merger.out());
+		}));
+		
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(system, materializer);
+		combinedSource
+    		.alsoTo(Sink.foreach(r -> System.out.println(r)))
+    		.to(Sink.foreach(supervisor::accept))
+    		.run(materializer);
     }
     
     private static Source<EntitiesEvent, ?> createSourceWithType(ActorSystem system, String topic, EntitiesEvent.Type type) {
