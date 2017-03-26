@@ -1,11 +1,11 @@
 package org.z.entities.engine;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericEnumSymbol;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -26,7 +26,9 @@ import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
 /**
@@ -34,12 +36,14 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
  */
 public class Main {
 	
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
+		final SchemaRegistryClient schemaRegistry = initializeSchemaRegistry();  // TODO- replace with actual registry
+		final KafkaSourceFactory sourceFactory = new KafkaSourceFactory(system, schemaRegistry);
 		
-		writeSomeData(system, materializer);  // for testing
-		createSupervisorStream(system, materializer);
+		writeSomeData(system, materializer, schemaRegistry);  // for testing
+		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
 		
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -52,10 +56,11 @@ public class Main {
 		}
     }
     
-    private static void createSupervisorStream(ActorSystem system, ActorMaterializer materializer) {
-    	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "creation", EntitiesEvent.Type.CREATE);
-		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(system, "merge", EntitiesEvent.Type.MERGE);
-		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(system, "split", EntitiesEvent.Type.SPLIT);
+    private static void createSupervisorStream(ActorMaterializer materializer, KafkaSourceFactory sourceFactory,
+    		SchemaRegistryClient schemaRegistry) {
+    	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(sourceFactory, "creation", EntitiesEvent.Type.CREATE);
+		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
+		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
 		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
 			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
 			directToMerger(builder, detectionsSource, merger);
@@ -64,14 +69,15 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 		
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(system, materializer);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory, schemaRegistry);
 		combinedSource
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);
     }
     
-    private static Source<EntitiesEvent, ?> createSourceWithType(ActorSystem system, String topic, EntitiesEvent.Type type) {
-    	return KafkaSourceFactory.create(system, topic)
+    private static Source<EntitiesEvent, ?> createSourceWithType(KafkaSourceFactory sourceFactory, 
+    		String topic, EntitiesEvent.Type type) {
+    	return sourceFactory.create(topic)
     			.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
     }
     
@@ -80,53 +86,44 @@ public class Main {
     	builder.from(builder.add(source).out()).toFanIn(merger);
     }
     
-    private static void writeSomeData(ActorSystem system, Materializer materializer) {
-    	SchemaRegistryClient schemaRegistry = KafkaSourceFactory.schemaRegistry;
-    	Schema.Parser parser = KafkaSourceFactory.parser;
-    	
+    private static void writeSomeData(ActorSystem system, Materializer materializer, 
+    		SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
 		ProducerSettings<String, Object> producerSettings = ProducerSettings
 				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
 				.withBootstrapServers("localhost:9092");
 		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
-		
-		String schemaString = "{\"type\": \"record\", "
-						+ "\"name\": \"detectionEvent\", "
-						+ "\"doc\": \"This is a schema for entity detection report event\", " 
-						+ "\"fields\": [{ \"name\": \"sourceName\", "
-										+ "\"type\": \"string\", "
-										+ "\"doc\" : \"interface name\" }, " 
-										+"{ \"name\": \"externalSystemID\", "
-										+ "\"type\": \"string\", "
-										+ "\"doc\":\"external system ID\"}]}";
-		Schema creationSchema = parser.parse(schemaString);
+
+		Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");
 		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
 				.set("sourceName", "source1")
 				.set("externalSystemID", "id1")
 				.build();
 		ProducerRecord<String, Object> producerRecord = new ProducerRecord<String, Object>("creation", creationRecord);
-		
 		Source.from(Arrays.asList(producerRecord))
 			.to(sink)
 			.run(materializer);
-		Schema coordinateSchema = parser.getTypes().get("coordinate");
+		
+		Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
+		Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
 		GenericRecord coordinate = new GenericRecordBuilder(coordinateSchema)
 				.set("lat", 4.5d)
 				.set("long", 3.4d)
 				.build();
-		Schema basicAttributesSchema = parser.getTypes().get("basicEntityAttributes");
 		GenericRecord basicAttributes = new GenericRecordBuilder(basicAttributesSchema)
 				.set("coordinate", coordinate)
 				.set("isNotTracked", false)
 				.set("entityOffset", 50l)
 				.build();
-		Schema dataSchema = parser.getTypes().get("generalEntityAttributes");
+		Schema dataSchema = getSchema(schemaRegistry, "generalEntityAttributes");
+		Schema nationalitySchema = dataSchema.getField("nationality").schema();
+		Schema categorySchema = dataSchema.getField("category").schema();
 		GenericRecord dataRecord = new GenericRecordBuilder(dataSchema)
 				.set("basicAttributes", basicAttributes)
 				.set("speed", 4.7)
 				.set("elevation", 7.8)
 				.set("course", 8.3)
-				.set("nationality", new GenericData.EnumSymbol(parser.getTypes().get("nationality"), "USA"))
-				.set("category", new GenericData.EnumSymbol(parser.getTypes().get("nationality"), "boat"))
+				.set("nationality", new GenericData.EnumSymbol(nationalitySchema, "USA"))
+				.set("category", new GenericData.EnumSymbol(categorySchema, "boat"))
 				.set("pictureURL", "huh?")
 				.set("height", 6.1)
 				.set("nickname", "rerere")
@@ -137,5 +134,77 @@ public class Main {
 		Source.from(Arrays.asList(producerRecord2))
 			.to(sink)
 			.run(materializer);
+    }
+    
+    private static Schema getSchema(SchemaRegistryClient schemaRegistry, String name) throws IOException, RestClientException {
+    	int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
+    	return schemaRegistry.getByID(id);
+    }
+    
+    private static SchemaRegistryClient initializeSchemaRegistry() {
+    	Schema.Parser parser = new Schema.Parser();
+    	try {
+	    	SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
+	    	schemaRegistry.register("detectionEvent", 
+	    			parser.parse("{\"type\": \"record\", "
+								+ "\"name\": \"detectionEvent\", "
+								+ "\"doc\": \"This is a schema for entity detection report event\", " 
+								+ "\"fields\": ["
+									+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, " 
+									+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+								+ "]}"));
+	    	schemaRegistry.register("basicEntityAttributes", 
+	    			parser.parse("{\"type\": \"record\","
+		    					+ "\"name\": \"basicEntityAttributes\","
+		    					+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
+		    					+ "\"fields\": ["
+		    						+ "{\"name\": \"coordinate\", \"type\":"
+		    								+ "{\"type\": \"record\","
+		    								+ "\"name\": \"coordinate\","
+		    								+ "\"doc\": \"Location attribute in grid format\","
+		    								+ "\"fields\": ["
+		    									+ "{\"name\": \"lat\",\"type\": \"double\"},"
+		    									+ "{\"name\": \"long\",\"type\": \"double\"}"
+		    								+ "]}},"
+		    						+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
+		    						+ "{\"name\": \"entityOffset\",\"type\": \"long\"}"
+		    					+ "]}"));
+	    	schemaRegistry.register("generalEntityAttributes", 
+	    			parser.parse("{\"type\": \"record\", "
+		    					+ "\"name\": \"generalEntityAttributes\","
+		    					+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
+		    					+ "\"fields\": ["
+		    						+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
+		    						+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
+		    						+ "{\"name\": \"elevation\",\"type\": \"double\"},"
+		    						+ "{\"name\": \"course\",\"type\": \"double\"},"
+		    						+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
+		    						+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
+		    						+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
+		    						+ "{\"name\": \"height\",\"type\": \"double\"},"
+		    						+ "{\"name\": \"nickname\",\"type\": \"string\"},"
+		    						+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
+		    					+ "]}"));
+	    	schemaRegistry.register("systemEntity", 
+	    			parser.parse("{\"type\": \"record\", "
+		        				+ "\"name\": \"systemEntity\","
+		        				+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
+		        				+ "\"fields\": ["
+		        					+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
+		    						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
+		    					+ "]}"));
+	    	schemaRegistry.register("entityFamily", 
+	    			parser.parse("{\"type\": \"record\", "
+		        				+ "\"name\": \"entityFamily\", "
+		        				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
+		        				+ "\"fields\": ["
+		        					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
+		    						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
+		    						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
+		    					+ "]}"));
+	    	return schemaRegistry;
+    	} catch (RestClientException | IOException e) {
+    		throw new ExceptionInInitializerError(e);
+    	}
     }
 }

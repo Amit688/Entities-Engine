@@ -10,12 +10,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import akka.NotUsed;
-import akka.actor.ActorSystem;
 import akka.kafka.javadsl.Consumer;
 import akka.stream.KillSwitches;
 import akka.stream.Materializer;
@@ -30,19 +28,22 @@ import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 
 
 /**
  * Created by Amit on 20/03/2017.
  */
 public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesEvent> {
-    ActorSystem system;
-    Materializer materializer;
-    Map<UUID, StreamDescriptor> streams;
+    private Materializer materializer;
+    private KafkaSourceFactory sourceFactory;
+    private SchemaRegistryClient schemaRegistry;
+    private Map<UUID, StreamDescriptor> streams;
     
-    public EntitiesSupervisor(ActorSystem system, Materializer materializer) {
-    	this.system = system;
+    public EntitiesSupervisor(Materializer materializer, KafkaSourceFactory sourceFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
+        this.sourceFactory = sourceFactory;
+        this.schemaRegistry = schemaRegistry;
         streams = new HashMap<>();
     }
 
@@ -119,7 +120,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				builder.add(Merge.create(sourceDescriptors.size()));
 		
 		for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = KafkaSourceFactory.create(system, sourceDescriptor);
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = sourceFactory.create(sourceDescriptor);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -141,13 +142,13 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     private void createStream(SourceDescriptor sourceDescriptor) {
-    	createStream(KafkaSourceFactory.create(system, sourceDescriptor), Arrays.asList(sourceDescriptor));
+    	createStream(sourceFactory.create(sourceDescriptor), Arrays.asList(sourceDescriptor));
     }
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors) {
 		UUID uuid = UUID.randomUUID();
-    	EntityManager entityManager = new EntityManager(uuid);
+    	EntityManager entityManager = new EntityManager(uuid, schemaRegistry);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
