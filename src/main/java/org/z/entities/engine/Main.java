@@ -36,7 +36,7 @@ public class Main {
     }
     
     private static void createSupervisorStream(ActorSystem system, ActorMaterializer materializer) {
-    	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "detection", EntitiesEvent.Type.CREATE);
+    	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(system, "creation", EntitiesEvent.Type.CREATE);
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(system, "merge", EntitiesEvent.Type.MERGE);
 		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(system, "split", EntitiesEvent.Type.SPLIT);
 		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {

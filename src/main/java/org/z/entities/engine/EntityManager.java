@@ -32,7 +32,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
 		System.out.println("processing report for uuid " + uuid);
 		GenericRecord data = (GenericRecord) record.value();
-		SourceDescriptor sourceDescriptor = getSourceDescriptor(record);
+		SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
 		preferredSource = sourceDescriptor;
 		sons.put(sourceDescriptor, data);
 		
@@ -40,9 +40,8 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
 	}
 	
-	private SourceDescriptor getSourceDescriptor(ConsumerRecord<String, Object> record) {
-		//TODO
-		return null;
+	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data) {
+		return new SourceDescriptor(topic, (String) data.get("externalSystemID"));
 	}
 	
 	private GenericRecord createUpdate() {
