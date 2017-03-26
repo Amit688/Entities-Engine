@@ -30,18 +30,23 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 
 	@Override
 	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
-		System.out.println("processing report for uuid " + uuid);
-		GenericRecord data = (GenericRecord) record.value();
-		SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
-		preferredSource = sourceDescriptor;
-		sons.put(sourceDescriptor, data);
-		
-		GenericRecord guiUpdate = createUpdate();
-		return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
+		try {
+			System.out.println("processing report for uuid " + uuid);
+			GenericRecord data = (GenericRecord) record.value();
+			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
+			preferredSource = sourceDescriptor;
+			sons.put(sourceDescriptor, data);
+			
+			GenericRecord guiUpdate = createUpdate();
+			return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+			throw e;
+		}
 	}
 	
 	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data) {
-		return new SourceDescriptor(topic, (String) data.get("externalSystemID"));
+		return new SourceDescriptor(topic, data.get("externalSystemID").toString());
 	}
 	
 	private GenericRecord createUpdate() {
@@ -66,19 +71,20 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	}
 	
 	private static Schema getSingleEntitySchema() {
-		return new Schema.Parser().parse(
+		return KafkaSourceFactory.parser.parse(
 				"{\"type\": \"record\", \"name\": \"systemEntity\",\"doc\": \"This is a schema of a single processed entity with all attributes.\","
 				+ "\"fields\": [{\"name\": \"entityID\", \"type\": \"string\"}, "
 							+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}]}");
 	}
 	
 	private static Schema getEntityFamilySchema() {
-		return new Schema.Parser().parse(
+		return KafkaSourceFactory.parser.parse(
 				"{\"type\": \"record\", \"name\": \"entityFamily\", \"doc\": \"This is a schema of processed entity with full attributes.\","
 				+ "\"fields\": [{\"name\": \"entityID\", \"type\": \"string\"},"
 							+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
 							+ "{\"name\" : \"sons\", \"type\":"
-															+ "[{\"type\": \"array\", \"items\": {\"name\": \"entity\", \"type\": \"systemEntity\"}}]"
+															+ "[{\"type\": \"array\", \"items\": \"systemEntity\"}]"
+//															+ "[{\"type\": \"array\", \"items\": {\"name\": \"entity\", \"type\": \"systemEntity\"}}]"
 							+ "}]}");
 	}
 

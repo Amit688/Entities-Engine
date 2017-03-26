@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
@@ -61,20 +62,18 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				break;
 			default:
 				System.out.println("received unknown event type: " + Objects.toString(event.getType()));
-				System.out.println("event data: " + Objects.toString(event.getData()));
 				break;
 	    	}
     	} catch (RuntimeException e) {
     		System.out.println("failed to process event of type " + Objects.toString(event.getType()));
-    		System.out.println("event data: " + Objects.toString(event.getData()));
     		e.printStackTrace();
     	}
     }
     
     public void create(GenericRecord data) {
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
-				(String) data.get("sourceName"), 
-				(String) data.get("externalSystemID"));
+				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
+				data.get("externalSystemID").toString());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
 		createStream(sourceDescriptor);
     }
