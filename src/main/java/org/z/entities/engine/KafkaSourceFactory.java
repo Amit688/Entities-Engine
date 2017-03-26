@@ -24,7 +24,7 @@ public class KafkaSourceFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
-	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, TopicDescriptor descriptor) {
+	public static Source<ConsumerRecord<String, Object>, ?> create(ActorSystem system, SourceDescriptor descriptor) {
 		return create(system, descriptor.getSensorId() + "." + descriptor.getReportsId());
 	}
 }

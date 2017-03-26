@@ -8,9 +8,9 @@ import akka.stream.UniqueKillSwitch;
 public class StreamDescriptor {
 	private UniqueKillSwitch killSwitch;
 	private UUID uuid;
-	private List<TopicDescriptor> topicDescriptors;
+	private List<SourceDescriptor> topicDescriptors;
 	
-	public StreamDescriptor(UniqueKillSwitch killSwitch, UUID uuid, List<TopicDescriptor> topicDescriptors) {
+	public StreamDescriptor(UniqueKillSwitch killSwitch, UUID uuid, List<SourceDescriptor> topicDescriptors) {
 		this.killSwitch = killSwitch;
 		this.uuid = uuid;
 		this.topicDescriptors = topicDescriptors;
@@ -24,7 +24,7 @@ public class StreamDescriptor {
 		return uuid;
 	}
 
-	public List<TopicDescriptor> getTopicDescriptors() {
+	public List<SourceDescriptor> getSourceDescriptors() {
 		return topicDescriptors;
 	}
 }

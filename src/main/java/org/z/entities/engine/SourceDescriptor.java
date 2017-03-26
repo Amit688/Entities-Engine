@@ -1,10 +1,10 @@
 package org.z.entities.engine;
 
-public class TopicDescriptor {
+public class SourceDescriptor {
 	private String sensorId;
 	private String reportsId;
 	
-	public TopicDescriptor(String sensorId, String reportsId) {
+	public SourceDescriptor(String sensorId, String reportsId) {
 		this.sensorId = sensorId;
 		this.reportsId = reportsId;
 	}
@@ -37,7 +37,7 @@ public class TopicDescriptor {
 		if (getClass() != obj.getClass()) {
 			return false;
 		}
-		TopicDescriptor other = (TopicDescriptor) obj;
+		SourceDescriptor other = (SourceDescriptor) obj;
 		if (reportsId == null) {
 			if (other.reportsId != null) {
 				return false;

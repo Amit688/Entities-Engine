@@ -1,7 +1,8 @@
 package org.z.entities.engine;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -18,12 +19,12 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private static Schema ENTITY_FAMILY_SCHEMA = getEntityFamilySchema();
 	
 	private UUID uuid;
-	private Map<TopicDescriptor, GenericRecord> latestUpdates;
-	private TopicDescriptor preferredSon;
+	private Map<SourceDescriptor, GenericRecord> sons;
+	private GenericRecord preferredSon;
 	
 	public EntityManager(UUID uuid) {
 		this.uuid = uuid;
-		latestUpdates = new HashMap<>();
+		sons = new HashMap<>();
 		preferredSon = null;
 	}
 
@@ -31,31 +32,38 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
 		System.out.println("processing report for uuid " + uuid);
 		GenericRecord data = (GenericRecord) record.value();
-		TopicDescriptor topicDescriptor = getTopicDescriptor(data);
-		preferredSon = topicDescriptor;
-		latestUpdates.put(topicDescriptor, data);
+		SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
+		preferredSon = data;
+		sons.put(sourceDescriptor, data);
 		
 		GenericRecord guiUpdate = createUpdate();
 		return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
 	}
 	
-	private TopicDescriptor getTopicDescriptor(GenericRecord data) {
+	private SourceDescriptor getSourceDescriptor(GenericRecord data) {
 		//TODO
 		return null;
 	}
 	
 	private GenericRecord createUpdate() {
-		//TODO- add all sons, verify field meanings
-		GenericRecord son = new GenericRecordBuilder(SINGLE_ENTITY_SCHEMA)
-				.set("entityID", uuid.toString())
-				.set("entityAttributes", preferredSon)
-				.build();
+		//TODO- verify field meanings
+		List<GenericRecord> sonsRecords = new ArrayList<>();
+		for (GenericRecord son : sons.values()) {
+			sonsRecords.add(createSingleEntityUpdate(son));
+		}
 		GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
 				.set("entityID", uuid.toString())
 				.set("entityAttributes", preferredSon)
-				.set("sons", Arrays.asList(son))
+				.set("sons", sonsRecords)
 				.build();
 		return family;
+	}
+	
+	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate) {
+		return new GenericRecordBuilder(SINGLE_ENTITY_SCHEMA)
+				.set("entityID", uuid.toString())
+				.set("entityAttributes", latestUpdate)
+				.build();
 	}
 	
 	private static Schema getSingleEntitySchema() {

@@ -35,12 +35,12 @@ import akka.stream.javadsl.Source;
 public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesEvent> {
     ActorSystem system;
     Materializer materializer;
-    Map<UUID, StreamDescriptor> streamDescriptors;
+    Map<UUID, StreamDescriptor> streams;
     
     public EntitiesSupervisor(ActorSystem system, Materializer materializer) {
     	this.system = system;
         this.materializer = materializer;
-        streamDescriptors = new HashMap<>();
+        streams = new HashMap<>();
     }
 
     @Override
@@ -58,6 +58,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				break;
 			default:
 				System.out.println("received unknown event type: " + event.type);
+				System.out.println("event data: " + event.data);
 				break;
 	    	}
     	} catch (RuntimeException e) {
@@ -68,11 +69,11 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     public void create(GenericRecord data) {
-		TopicDescriptor topicDescriptor = new TopicDescriptor(
+		SourceDescriptor sourceDescriptor = new SourceDescriptor(
 				(String) data.get("sourceName"), 
 				(String) data.get("externalSystemID"));
-		System.out.println("creating entity manager stream for topic " + topicDescriptor);
-		createStream(topicDescriptor);
+		System.out.println("creating entity manager stream for source " + sourceDescriptor);
+		createStream(sourceDescriptor);
     }
     
     private void merge(GenericRecord data) {
@@ -80,18 +81,18 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		List<String> idsToMerge = (List<String>) data.get("mergedEntitiesId");
     	List<UUID> uuidsToMerge = toUUIDs(idsToMerge);
     	
-    	if (streamDescriptors.keySet().containsAll(uuidsToMerge)) {
-    		List<TopicDescriptor> topicDescriptorsToMerge = new ArrayList<>(uuidsToMerge.size());
+    	if (streams.keySet().containsAll(uuidsToMerge)) {
+    		List<SourceDescriptor> sourceDescriptorsToMerge = new ArrayList<>(uuidsToMerge.size());
     		for (UUID uuid : uuidsToMerge) {
-    			StreamDescriptor stream = streamDescriptors.remove(uuid);
+    			StreamDescriptor stream = streams.remove(uuid);
     			stream.getKillSwitch().shutdown();
-    			topicDescriptorsToMerge.addAll(stream.getTopicDescriptors());
+    			sourceDescriptorsToMerge.addAll(stream.getSourceDescriptors());
     		}
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
-    				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, topicDescriptorsToMerge)));
-    		createStream(mergedSource, topicDescriptorsToMerge);
+    				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sourceDescriptorsToMerge)));
+    		createStream(mergedSource, sourceDescriptorsToMerge);
     	} else {
-    		uuidsToMerge.removeAll(streamDescriptors.keySet());
+    		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
     		throw new RuntimeException("tried to merge non existent entities: " + debugString);
     	}
@@ -106,11 +107,11 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
 	
 	private SourceShape<ConsumerRecord<String, Object>> createMergedSourceGraph(
-			Builder<NotUsed> builder, List<TopicDescriptor> topicDescriptorsToMerge) {
+			Builder<NotUsed> builder, List<SourceDescriptor> sourceDescriptorsToMerge) {
 		UniformFanInShape<ConsumerRecord<String, Object>, ConsumerRecord<String, Object>> merger = 
-				builder.add(Merge.create(topicDescriptorsToMerge.size()));
-		for (TopicDescriptor topic : topicDescriptorsToMerge) {
-			Source<ConsumerRecord<String, Object>, ?> source = KafkaSourceFactory.create(system, topic);
+				builder.add(Merge.create(sourceDescriptorsToMerge.size()));
+		for (SourceDescriptor sourceDescriptor : sourceDescriptorsToMerge) {
+			Source<ConsumerRecord<String, Object>, ?> source = KafkaSourceFactory.create(system, sourceDescriptor);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -120,23 +121,23 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private void split(GenericRecord data) {
     	String idToSplit = (String) data.get("splitedEntityID");
     	UUID uuidToSplit = UUID.fromString(idToSplit);
-    	StreamDescriptor splittedDescriptor = streamDescriptors.remove(uuidToSplit);
-    	if (splittedDescriptor == null) {
+    	StreamDescriptor splittedStream = streams.remove(uuidToSplit);
+    	if (splittedStream == null) {
     		throw new RuntimeException("tried to split non existent entity with id " + idToSplit);
     	}
     	
-    	splittedDescriptor.getKillSwitch().shutdown();
-    	for (TopicDescriptor topicDescriptor : splittedDescriptor.getTopicDescriptors()) {
-    		createStream(topicDescriptor);
+    	splittedStream.getKillSwitch().shutdown();
+    	for (SourceDescriptor sourceDescriptor : splittedStream.getSourceDescriptors()) {
+    		createStream(sourceDescriptor);
     	}
     }
     
-    private void createStream(TopicDescriptor topicDescriptor) {
-    	createStream(KafkaSourceFactory.create(system, topicDescriptor), Arrays.asList(topicDescriptor));
+    private void createStream(SourceDescriptor sourceDescriptor) {
+    	createStream(KafkaSourceFactory.create(system, sourceDescriptor), Arrays.asList(sourceDescriptor));
     }
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
-			List<TopicDescriptor> topicDescriptors) {
+			List<SourceDescriptor> sourceDescriptors) {
 		UUID uuid = UUID.randomUUID();
     	EntityManager entityManager = new EntityManager(uuid);
     	UniqueKillSwitch killSwitch = source
@@ -146,8 +147,8 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     			.run(materializer);
     	
     	System.out.println("storing stream descriptor for later use");
-    	streamDescriptors.put(uuid, 
-    			new StreamDescriptor(killSwitch, uuid, topicDescriptors));
+    	streams.put(uuid, 
+    			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
 	}
     
     private static void dummySink(ProducerRecord<String, GenericRecord> record) {
