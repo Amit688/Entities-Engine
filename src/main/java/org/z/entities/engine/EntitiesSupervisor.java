@@ -149,7 +149,8 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors) {
-		UUID uuid = UUID.randomUUID();
+//		UUID uuid = UUID.randomUUID();
+		UUID uuid = UUID.fromString("38400000-8cf0-11bd-b23e-10b96e4ef00" + sourceDescriptors.get(0).getSensorId().substring(sourceDescriptors.get(0).getSensorId().length() - 2));
     	EntityManager entityManager = new EntityManager(uuid, schemaRegistry);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
