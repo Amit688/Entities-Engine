@@ -153,6 +153,31 @@ public class Main {
 									+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, " 
 									+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
 								+ "]}"));
+	    	schemaRegistry.register("mergeEvent",
+	    			parser.parse("{\"type\": \"record\", "
+								+ "\"name\": \"mergeEvent\", "
+								+ "\"doc\": \"This is a schema for merge entities event\", "
+								+ "\"fields\": ["
+									+ "{ \"name\": \"mergedEntitiesId\", \"type\":\n" +
+							"    \t{\n" +
+							"      \t\"type\": \"array\",\n" +
+							"      \t\"items\": {\n" +
+							"      \t\"name\": \"entityId\",\n" +
+							"      \t\"type\": \"string\"\n" +
+							"      \t}\n" +
+							"  \t}}"
+								+ "]}"));
+	    	schemaRegistry.register("splitEvent",
+	    			parser.parse("{\n" +
+							"  \"type\": \"record\",\n" +
+							"  \"name\": \"splitEvent\",\n" +
+							"  \"fields\": [\n" +
+							"\t{\n" +
+							"  \t\"name\": \"splitedEntityID\",\n" +
+							"  \t\"type\": \"string\"\n" +
+							"\t}\n" +
+							" ] \n" +
+							"}"));
 	    	schemaRegistry.register("basicEntityAttributes", 
 	    			parser.parse("{\"type\": \"record\","
 		    					+ "\"name\": \"basicEntityAttributes\","
