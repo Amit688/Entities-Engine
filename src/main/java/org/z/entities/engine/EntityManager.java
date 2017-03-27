@@ -15,7 +15,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-;import javax.lang.model.element.Element;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, GenericRecord>> {
 	private UUID uuid;
