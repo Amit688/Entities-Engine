@@ -33,7 +33,7 @@ public class KafkaSourceFactory {
 	public Source<ConsumerRecord<String, Object>, Consumer.Control> create(String topic) {
 		ConsumerSettings<String, Object> consumerSettings = 
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
-    			.withBootstrapServers("localhost:9092")
+    			.withBootstrapServers(System.getenv("KAFKA_ADDRESS"))
     			.withGroupId("group1")
     			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return Consumer.plainSource(consumerSettings, 
