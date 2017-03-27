@@ -15,7 +15,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-;
+;import javax.lang.model.element.Element;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, GenericRecord>> {
 	private UUID uuid;
@@ -33,7 +33,10 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	@Override
 	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
 		try {
-			System.out.println("processing report for uuid " + uuid);
+			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
+			System.out.println("sons are:");
+			for (SourceDescriptor e: sons.keySet())
+				System.out.println(e.getReportsId());
 			GenericRecord data = (GenericRecord) record.value();
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
 			preferredSource = sourceDescriptor;

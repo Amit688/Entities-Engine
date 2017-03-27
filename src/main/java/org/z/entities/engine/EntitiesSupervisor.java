@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
@@ -80,10 +81,10 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     private void merge(GenericRecord data) {
-    	@SuppressWarnings("unchecked")
-		List<String> idsToMerge = (List<String>) data.get("mergedEntitiesId");
+		List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
     	List<UUID> uuidsToMerge = toUUIDs(idsToMerge);
-    	
+		System.out.println("got merge event for:");
+		uuidsToMerge.forEach(System.out::println);
     	if (streams.keySet().containsAll(uuidsToMerge)) {
     		List<SourceDescriptor> sourceDescriptorsToMerge = killAndFlattenSources(uuidsToMerge);
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
@@ -96,10 +97,10 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	}
     }
 
-	private List<UUID> toUUIDs(List<String> ids) {
+	private List<UUID> toUUIDs(List<Utf8> ids) {
     	List<UUID> uuids = new ArrayList<>(ids.size());
-    	for (String id : ids) {
-    		uuids.add(UUID.fromString(id));
+    	for (Utf8 id : ids) {
+    		uuids.add(UUID.fromString(id.toString()));
     	}
     	return uuids;
     }
@@ -128,7 +129,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 	}
     
     private void split(GenericRecord data) {
-    	String idToSplit = (String) data.get("splitedEntityID");
+    	String idToSplit = data.get("splitedEntityID").toString();
     	UUID uuidToSplit = UUID.fromString(idToSplit);
     	StreamDescriptor splittedStream = streams.remove(uuidToSplit);
     	if (splittedStream == null) {
