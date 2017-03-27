@@ -131,6 +131,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private void split(GenericRecord data) {
     	String idToSplit = data.get("splitedEntityID").toString();
     	UUID uuidToSplit = UUID.fromString(idToSplit);
+		System.out.println("got split event for: " + uuidToSplit.toString());
     	StreamDescriptor splittedStream = streams.remove(uuidToSplit);
     	if (splittedStream == null) {
     		throw new RuntimeException("tried to split non existent entity with id " + idToSplit);

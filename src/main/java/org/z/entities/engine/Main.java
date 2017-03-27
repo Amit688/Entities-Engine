@@ -41,9 +41,9 @@ public class Main {
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = initializeSchemaRegistry();  // TODO- replace with actual registry
 		final KafkaSourceFactory sourceFactory = new KafkaSourceFactory(system, schemaRegistry);
-		
-		writeSomeData(system, materializer, schemaRegistry);  // for testing
+
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
+		writeSomeData(system, materializer, schemaRegistry);  // for testing
 		
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -102,6 +102,15 @@ public class Main {
 		Source.from(Arrays.asList(producerRecord))
 			.to(sink)
 			.run(materializer);
+
+		GenericRecord creationRecord2 = new GenericRecordBuilder(creationSchema)
+				.set("sourceName", "source2")
+				.set("externalSystemID", "id1")
+				.build();
+		producerRecord = new ProducerRecord<String, Object>("creation", creationRecord2);
+		Source.from(Arrays.asList(producerRecord))
+			.to(sink)
+			.run(materializer);
 		
 		Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
 		Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
@@ -130,11 +139,85 @@ public class Main {
 				.set("externalSystemID", "id1")
 				.build();
 		ProducerRecord<String, Object> producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-		
+
 		Source.from(Arrays.asList(producerRecord2))
 			.to(sink)
 			.run(materializer);
-    }
+
+		producerRecord2 = new ProducerRecord<String, Object>("source2", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+				.to(sink)
+				.run(materializer);
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+		Schema mergeSchema = getSchema(schemaRegistry, "mergeEvent");
+		GenericRecord mergeRecord = new GenericRecordBuilder(mergeSchema)
+				.set("mergedEntitiesId", Arrays.asList("38400000-8cf0-11bd-b23f-0b96e4ef00e1",
+						"38400000-8cf0-11bd-b23f-0b96e4ef00e2"))
+				.build();
+		producerRecord = new ProducerRecord<String, Object>("merge", mergeRecord);
+		Source.from(Arrays.asList(producerRecord))
+				.to(sink)
+				.run(materializer);
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+				.to(sink)
+				.run(materializer);
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+				.to(sink)
+				.run(materializer);
+
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+
+		Schema splitSchema = getSchema(schemaRegistry, "splitEvent");
+		GenericRecord splitRecord = new GenericRecordBuilder(splitSchema)
+				.set("splitedEntityID", "38400000-8cf0-11bd-b23f-0b96e4ef00e1")
+				.build();
+		producerRecord = new ProducerRecord<String, Object>("split", splitRecord);
+		Source.from(Arrays.asList(producerRecord))
+				.to(sink)
+				.run(materializer);
+
+		try {
+			Thread.sleep(5000);
+		} catch (Exception e) {
+
+		}
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+				.to(sink)
+				.run(materializer);
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+				.to(sink)
+				.run(materializer);
+
+	}
     
     private static Schema getSchema(SchemaRegistryClient schemaRegistry, String name) throws IOException, RestClientException {
     	int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
