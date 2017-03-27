@@ -35,7 +35,6 @@ public class KafkaSourceFactory {
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
     			.withBootstrapServers("localhost:9092")
     			.withGroupId("group1")
-    			.withProperty("schema.registry.url", "https://schema-registry-ui.landoop.com")
     			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return Consumer.plainSource(consumerSettings, 
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
