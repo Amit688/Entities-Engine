@@ -90,7 +90,7 @@ public class Main {
     		SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
 		ProducerSettings<String, Object> producerSettings = ProducerSettings
 				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-				.withBootstrapServers("localhost:9092");
+				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
 		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
 
 		Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");

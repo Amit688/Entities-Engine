@@ -6,4 +6,4 @@ RUN tar -xvf testing.tar
 
 ENV KAFKA_ADDRESS "localhost:9092"
 
-CMD "/usr/local/bin/testing"
+CMD "/usr/local/testing/bin/testing"
