@@ -6,4 +6,5 @@ RUN tar -xvf testing.tar
 
 ENV KAFKA_ADDRESS "localhost:9092"
 
-CMD "/usr/local/testing/bin/testing"
+WORKDIR /usr/local/testing/lib/
+CMD java -cp "*" org.z.entities.engine.Main
