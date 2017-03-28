@@ -37,6 +37,8 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
+    	System.setProperty("akka.log-config-on-start", "on");
+		System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = initializeSchemaRegistry();  // TODO- replace with actual registry
