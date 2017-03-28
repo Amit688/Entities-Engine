@@ -1,4 +1,4 @@
-FROM openjdk:8
+FROM openjdk:8-alpine
 
 WORKDIR /usr/local
 ADD https://github.com/Amit688/Entities-Engine/releases/download/0.0.1/testing.tar .
