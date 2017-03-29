@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -37,16 +38,16 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-    	System.setProperty("akka.log-config-on-start", "on");
 		System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
+		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
+		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-		final SchemaRegistryClient schemaRegistry = initializeSchemaRegistry();  // TODO- replace with actual registry
+		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_ADDRESS")));
 		final KafkaSourceFactory sourceFactory = new KafkaSourceFactory(system, schemaRegistry);
 
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
-		writeSomeData(system, materializer, schemaRegistry);  // for testing
-		
+
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
