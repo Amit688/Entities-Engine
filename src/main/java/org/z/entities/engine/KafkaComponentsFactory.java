@@ -1,24 +1,33 @@
 package org.z.entities.engine;
 
+import java.util.concurrent.CompletionStage;
+
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 
+import akka.Done;
 import akka.actor.ActorSystem;
 import akka.kafka.ConsumerSettings;
+import akka.kafka.ProducerSettings;
 import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
+import akka.kafka.javadsl.Producer;
+import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
-public class KafkaSourceFactory {
+public class KafkaComponentsFactory {
 	private ActorSystem system;
 	private SchemaRegistryClient schemaRegistry;
 	
-	public KafkaSourceFactory(ActorSystem system, SchemaRegistryClient schemaRegistry) {
+	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry) {
 		this.system = system;
 		this.schemaRegistry = schemaRegistry;
 	}
@@ -30,7 +39,7 @@ public class KafkaSourceFactory {
 	 * @param topic
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> create(String topic) {
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic) {
 		ConsumerSettings<String, Object> consumerSettings = 
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
     			.withBootstrapServers(System.getenv("KAFKA_ADDRESS"))
@@ -48,12 +57,11 @@ public class KafkaSourceFactory {
 	 * @param reportsId
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> create(String topic, String reportsId) {
-		return create(topic).filter(record -> filterByReportsId(record, reportsId));
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, String reportsId) {
+		return createSource(topic).filter(record -> filterByReportsId(record, reportsId));
 	}
 	
 	private boolean filterByReportsId(ConsumerRecord<String, Object> incomingUpdate, String reportsId) {
-		System.out.println("checking");
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
 	}
@@ -65,7 +73,14 @@ public class KafkaSourceFactory {
 	 * @param descriptor
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> create(SourceDescriptor descriptor) {
-		return create(descriptor.getSensorId(), descriptor.getReportsId());
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor) {
+		return createSource(descriptor.getSensorId(), descriptor.getReportsId());
+	}
+	
+	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> createSink() {
+		ProducerSettings<String, Object> producerSettings = ProducerSettings
+				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
+				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
+		return Producer.plainSink(producerSettings);
 	}
 }

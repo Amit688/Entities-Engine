@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -27,6 +26,7 @@ import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
@@ -44,7 +44,7 @@ public class Main {
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_ADDRESS")));
-		final KafkaSourceFactory sourceFactory = new KafkaSourceFactory(system, schemaRegistry);
+		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry);
 
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
 
@@ -59,7 +59,7 @@ public class Main {
 		}
     }
     
-    private static void createSupervisorStream(ActorMaterializer materializer, KafkaSourceFactory sourceFactory,
+    private static void createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory,
     		SchemaRegistryClient schemaRegistry) {
     	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(sourceFactory, "creation", EntitiesEvent.Type.CREATE);
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
@@ -78,9 +78,9 @@ public class Main {
     		.run(materializer);
     }
     
-    private static Source<EntitiesEvent, ?> createSourceWithType(KafkaSourceFactory sourceFactory, 
+    private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
     		String topic, EntitiesEvent.Type type) {
-    	return sourceFactory.create(topic)
+    	return sourceFactory.createSource(topic)
     			.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
     }
     

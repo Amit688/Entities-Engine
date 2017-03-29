@@ -16,7 +16,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
-public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, GenericRecord>> {
+public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
 	private UUID uuid;
 	private SchemaRegistryClient schemaRegistry;
 	private Map<SourceDescriptor, GenericRecord> sons;
@@ -30,7 +30,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	}
 
 	@Override
-	public ProducerRecord<String, GenericRecord> apply(ConsumerRecord<String, Object> record) {
+	public ProducerRecord<String, Object> apply(ConsumerRecord<String, Object> record) {
 		try {
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
@@ -42,7 +42,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			sons.put(sourceDescriptor, data);
 			try {
 				GenericRecord guiUpdate = createUpdate();
-				return new ProducerRecord<String, GenericRecord>("ui", guiUpdate);
+				return new ProducerRecord<String, Object>("ui", guiUpdate);
 			} catch (IOException | RestClientException e) {
 				System.out.println("failed to generate update to ui");
 				e.printStackTrace();

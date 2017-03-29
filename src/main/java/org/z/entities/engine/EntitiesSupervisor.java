@@ -37,11 +37,11 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
  */
 public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesEvent> {
     private Materializer materializer;
-    private KafkaSourceFactory sourceFactory;
+    private KafkaComponentsFactory sourceFactory;
     private SchemaRegistryClient schemaRegistry;
     private Map<UUID, StreamDescriptor> streams;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaSourceFactory sourceFactory, SchemaRegistryClient schemaRegistry) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory sourceFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
         this.sourceFactory = sourceFactory;
         this.schemaRegistry = schemaRegistry;
@@ -121,7 +121,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				builder.add(Merge.create(sourceDescriptors.size()));
 		
 		for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = sourceFactory.create(sourceDescriptor);
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = sourceFactory.createSource(sourceDescriptor);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -144,7 +144,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     private void createStream(SourceDescriptor sourceDescriptor) {
-    	createStream(sourceFactory.create(sourceDescriptor), Arrays.asList(sourceDescriptor));
+    	createStream(sourceFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor));
     }
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
@@ -154,15 +154,11 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
-    			.to(Sink.foreach(EntitiesSupervisor::dummySink))
+    			.to(sourceFactory.createSink())
     			.run(materializer);
     	
     	System.out.println("storing stream descriptor for later use");
     	streams.put(uuid, 
     			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
 	}
-    
-    private static void dummySink(ProducerRecord<String, GenericRecord> record) {
-    	System.out.println("wrote report to sink: " + record.value());
-    }
 }
