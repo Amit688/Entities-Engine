@@ -43,7 +43,7 @@ public class Main {
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("IDENTITY")));
+		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry);
 
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
