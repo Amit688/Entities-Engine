@@ -42,7 +42,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			sons.put(sourceDescriptor, data);
 			try {
 				GenericRecord guiUpdate = createUpdate();
-				return new ProducerRecord<String, Object>("ui", guiUpdate);
+				return new ProducerRecord<String, Object>("update", guiUpdate);
 			} catch (IOException | RestClientException e) {
 				System.out.println("failed to generate update to ui");
 				e.printStackTrace();

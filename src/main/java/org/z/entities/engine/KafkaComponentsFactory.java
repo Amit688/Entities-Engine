@@ -26,10 +26,12 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class KafkaComponentsFactory {
 	private ActorSystem system;
 	private SchemaRegistryClient schemaRegistry;
+	private String kafkaUrl;
 	
-	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry) {
+	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl) {
 		this.system = system;
 		this.schemaRegistry = schemaRegistry;
+		this.kafkaUrl = kafkaUrl;
 	}
 	
 	/**
@@ -42,7 +44,7 @@ public class KafkaComponentsFactory {
 	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic) {
 		ConsumerSettings<String, Object> consumerSettings = 
     			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
-    			.withBootstrapServers(System.getenv("KAFKA_ADDRESS"))
+    			.withBootstrapServers(kafkaUrl)
     			.withGroupId("group1")
     			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return Consumer.plainSource(consumerSettings, 
@@ -80,7 +82,7 @@ public class KafkaComponentsFactory {
 	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> createSink() {
 		ProducerSettings<String, Object> producerSettings = ProducerSettings
 				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
+				.withBootstrapServers(kafkaUrl);
 		return Producer.plainSink(producerSettings);
 	}
 }
