@@ -10,6 +10,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.z.entities.engine.EntitiesEvent.Type;
 
 import akka.Done;
 import akka.NotUsed;
@@ -43,9 +44,11 @@ public class Main {
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
+//		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
-
+		
+//		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -65,7 +68,7 @@ public class Main {
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
 		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
 		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
-			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
+			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(1));
 			directToMerger(builder, detectionsSource, merger);
 			directToMerger(builder, mergesSource, merger);
 			directToMerger(builder, splitsSource, merger);
@@ -317,5 +320,26 @@ public class Main {
     	} catch (RestClientException | IOException e) {
     		throw new ExceptionInInitializerError(e);
     	}
+    }
+    
+    private static void registerSchemas(SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
+    	Schema.Parser parser = new Schema.Parser();
+    	schemaRegistry.register("systemEntity", 
+    			parser.parse("{\"type\": \"record\", "
+	        				+ "\"name\": \"systemEntity\","
+	        				+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
+	        				+ "\"fields\": ["
+	        					+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
+	    						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
+	    					+ "]}"));
+    	schemaRegistry.register("entityFamily", 
+    			parser.parse("{\"type\": \"record\", "
+	        				+ "\"name\": \"entityFamily\", "
+	        				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
+	        				+ "\"fields\": ["
+	        					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
+	    						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
+	    						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
+	    					+ "]}"));
     }
 }

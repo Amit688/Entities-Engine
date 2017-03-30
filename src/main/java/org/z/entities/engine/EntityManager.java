@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
+import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -17,6 +18,9 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
+	private static Schema SYSTEM_ENTITY_SCHEMA = null;
+	private static Schema ENTITY_FAMILY_SCHEMA = null;
+	
 	private UUID uuid;
 	private SchemaRegistryClient schemaRegistry;
 	private Map<SourceDescriptor, GenericRecord> sons;
@@ -27,6 +31,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		this.schemaRegistry = schemaRegistry;
 		sons = new HashMap<>();
 		preferredSource = null;
+		registerSchemas();
 	}
 
 	@Override
@@ -44,7 +49,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				GenericRecord guiUpdate = createUpdate();
 				return new ProducerRecord<String, Object>("update", guiUpdate);
 			} catch (IOException | RestClientException e) {
-				System.out.println("failed to generate update to ui");
+				System.out.println("failed to generate update");
 				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
@@ -64,8 +69,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		for (GenericRecord son : sons.values()) {
 			sonsRecords.add(createSingleEntityUpdate(son));
 		}
-		int id = schemaRegistry.getLatestSchemaMetadata("entityFamily").getId();
-		GenericRecord family = new GenericRecordBuilder(schemaRegistry.getByID(id))
+		GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
 				.set("entityID", uuid.toString())
 				.set("entityAttributes", sons.get(preferredSource))
 				.set("sons", sonsRecords)
@@ -74,11 +78,63 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	}
 	
 	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate) throws IOException, RestClientException {
-		int id = schemaRegistry.getLatestSchemaMetadata("systemEntity").getId();
-		return new GenericRecordBuilder(schemaRegistry.getByID(id))
+		return new GenericRecordBuilder(SYSTEM_ENTITY_SCHEMA)
 				.set("entityID", uuid.toString())
 				.set("entityAttributes", latestUpdate)
 				.build();
+	}
+	
+	private void registerSchemas() {
+		Schema.Parser parser = new Schema.Parser();
+		parser.parse("{\"type\": \"record\","
+				+ "\"name\": \"basicEntityAttributes\","
+				+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
+				+ "\"fields\": ["
+					+ "{\"name\": \"coordinate\", \"type\":"
+							+ "{\"type\": \"record\","
+							+ "\"name\": \"coordinate\","
+							+ "\"doc\": \"Location attribute in grid format\","
+							+ "\"fields\": ["
+								+ "{\"name\": \"lat\",\"type\": \"double\"},"
+								+ "{\"name\": \"long\",\"type\": \"double\"}"
+							+ "]}},"
+					+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
+					+ "{\"name\": \"entityOffset\",\"type\": \"long\"}"
+				+ "]}");
+		parser.parse("{\"type\": \"record\", "
+				+ "\"name\": \"generalEntityAttributes\","
+				+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
+				+ "\"fields\": ["
+					+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
+					+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
+					+ "{\"name\": \"elevation\",\"type\": \"double\"},"
+					+ "{\"name\": \"course\",\"type\": \"double\"},"
+					+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
+					+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
+					+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
+					+ "{\"name\": \"height\",\"type\": \"double\"},"
+					+ "{\"name\": \"nickname\",\"type\": \"string\"},"
+					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
+				+ "]}");
+		if (SYSTEM_ENTITY_SCHEMA == null) {
+			SYSTEM_ENTITY_SCHEMA = parser.parse("{\"type\": \"record\", "
+					+ "\"name\": \"systemEntity\","
+					+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
+					+ "\"fields\": ["
+						+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
+						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
+					+ "]}");
+		}
+		if (ENTITY_FAMILY_SCHEMA == null) {
+			ENTITY_FAMILY_SCHEMA = parser.parse("{\"type\": \"record\", "
+    				+ "\"name\": \"entityFamily\", "
+    				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
+    				+ "\"fields\": ["
+    					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
+						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
+						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
+					+ "]}");
+		}
 	}
 
 }

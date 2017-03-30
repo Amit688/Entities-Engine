@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.producer.ProducerRecord;
 
 import akka.NotUsed;
 import akka.kafka.javadsl.Consumer;
@@ -27,7 +26,6 @@ import akka.stream.javadsl.GraphDSL;
 import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Merge;
-import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 
