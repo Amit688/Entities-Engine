@@ -68,7 +68,7 @@ public class Main {
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
 		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
 		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
-			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(1));
+			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
 			directToMerger(builder, detectionsSource, merger);
 			directToMerger(builder, mergesSource, merger);
 			directToMerger(builder, splitsSource, merger);
