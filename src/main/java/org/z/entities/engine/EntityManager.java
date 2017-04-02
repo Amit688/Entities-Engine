@@ -79,7 +79,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate) throws IOException, RestClientException {
 		return new GenericRecordBuilder(SYSTEM_ENTITY_SCHEMA)
-				.set("entityID", uuid.toString())
+				.set("entityID", latestUpdate.get("entityID"))
 				.set("entityAttributes", latestUpdate)
 				.build();
 	}
