@@ -35,13 +35,13 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
  */
 public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesEvent> {
     private Materializer materializer;
-    private KafkaComponentsFactory sourceFactory;
+    private KafkaComponentsFactory componentsFactory;
     private SchemaRegistryClient schemaRegistry;
     private Map<UUID, StreamDescriptor> streams;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory sourceFactory, SchemaRegistryClient schemaRegistry) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
-        this.sourceFactory = sourceFactory;
+        this.componentsFactory = componentsFactory;
         this.schemaRegistry = schemaRegistry;
         streams = new HashMap<>();
     }
@@ -79,6 +79,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     private void merge(GenericRecord data) {
+		@SuppressWarnings("unchecked")  // From schema
 		List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
     	List<UUID> uuidsToMerge = toUUIDs(idsToMerge);
 		System.out.println("got merge event for:");
@@ -107,7 +108,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		List<SourceDescriptor> sources = new ArrayList<>(streams.size());
 		for (UUID uuid : uuidsToKill) {
 			StreamDescriptor stream = streams.remove(uuid);
-			stream.getKillSwitch().shutdown();
+			stopStream(stream);
 			sources.addAll(stream.getSourceDescriptors());
 		}
 		return sources;
@@ -119,7 +120,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				builder.add(Merge.create(sourceDescriptors.size()));
 		
 		for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = sourceFactory.createSource(sourceDescriptor);
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.createSource(sourceDescriptor);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -135,14 +136,14 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		throw new RuntimeException("tried to split non existent entity with id " + idToSplit);
     	}
     	
-    	splittedStream.getKillSwitch().shutdown();
+    	stopStream(splittedStream);
     	for (SourceDescriptor sourceDescriptor : splittedStream.getSourceDescriptors()) {
     		createStream(sourceDescriptor);
     	}
     }
     
     private void createStream(SourceDescriptor sourceDescriptor) {
-    	createStream(sourceFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor));
+    	createStream(componentsFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor));
     }
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
@@ -152,11 +153,15 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
-    			.to(sourceFactory.createSink())
+    			.to(componentsFactory.createSink())
     			.run(materializer);
     	
     	System.out.println("storing stream descriptor for later use");
     	streams.put(uuid, 
     			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
 	}
+    
+    private void stopStream(StreamDescriptor stream) {
+    	stream.getKillSwitch().shutdown();
+    }
 }
