@@ -4,13 +4,13 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 
+import kamon.Kamon;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.z.entities.engine.EntitiesEvent.Type;
 
 import akka.Done;
 import akka.NotUsed;
@@ -32,14 +32,14 @@ import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
-
 /**
  * Created by Amit on 20/03/2017.
  */
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-		System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
+		Kamon.start();
+    	System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
     	final ActorSystem system = ActorSystem.create();
@@ -54,6 +54,7 @@ public class Main {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
+				Kamon.shutdown();
 			}
 		});
 		System.out.println("Ready");

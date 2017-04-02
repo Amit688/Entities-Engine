@@ -14,6 +14,7 @@ apply plugin: 'application'
 
 repositories {
     mavenCentral()
+	jcenter()
 	maven {
 		url "http://packages.confluent.io/maven/"
 	}
@@ -27,6 +28,14 @@ dependencies {
 	compile "io.confluent:kafka-avro-serializer:3.2.0"
 	compile "io.confluent:kafka-schema-registry:3.2.0"
 	compile "io.confluent:common:3.2.0"
+
+	// Kamon
+	// https://mvnrepository.com/artifact/io.kamon/kamon-akka_2.11
+	compile group: 'io.kamon', name: 'kamon-akka_2.11', version: '0.6.3'
+	// https://mvnrepository.com/artifact/org.aspectj/aspectjweaver
+	compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10'
+
+
 
 	testCompile 'junit:junit:4.12'
 }
