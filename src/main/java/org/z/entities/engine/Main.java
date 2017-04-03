@@ -38,15 +38,15 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-//		Kamon.start();
+		Kamon.start();
     	System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-//		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
-		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
+		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
+//		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
+		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,"localhost:9092");
 		
 //		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
@@ -54,7 +54,7 @@ public class Main {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
-//				Kamon.shutdown();
+				Kamon.shutdown();
 			}
 		});
 		System.out.println("Ready");

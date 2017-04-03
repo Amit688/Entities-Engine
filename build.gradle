@@ -34,8 +34,9 @@ dependencies {
 	compile group: 'io.kamon', name: 'kamon-akka_2.11', version: '0.6.3'
 	// https://mvnrepository.com/artifact/org.aspectj/aspectjweaver
 	compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10'
-
-
+	// https://mvnrepository.com/artifact/io.kamon/kamon-jmx_2.10
+	compile group: 'io.kamon', name: 'kamon-jmx_2.11', version: '0.6.6'
+	compile group: 'org.slf4j', name:'slf4j-simple', version: '1.7.6'
 
 	testCompile 'junit:junit:4.12'
 }
