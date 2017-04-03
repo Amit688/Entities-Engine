@@ -144,7 +144,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		if (STATE_CHANGES_SCHEMA == null) {
 			STATE_CHANGES_SCHEMA = parser.parse("{\"type\": \"enum\", "
 					+ "\"name\": \"stateChanges\", "
-					+ "symbols\":[\"MERGED\", \"WAS_SPLIT\", \"SON_TAKEN\", \"NONE\"]}");
+					+ "\"symbols\":[\"MERGED\", \"WAS_SPLIT\", \"SON_TAKEN\", \"NONE\"]}");
 		}
 		if (ENTITY_FAMILY_SCHEMA == null) {
 			ENTITY_FAMILY_SCHEMA = parser.parse("{\"type\": \"record\", "
