@@ -10,14 +10,10 @@ import java.util.function.Function;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericEnumSymbol;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
-
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
@@ -25,19 +21,23 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private static Schema STATE_CHANGES_SCHEMA = null;
 	
 	private UUID uuid;
-	private SchemaRegistryClient schemaRegistry;
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
 	private GenericData.EnumSymbol stateChange;
-	private boolean isInitialStateSent = false;
 	
-	public EntityManager(UUID uuid, SchemaRegistryClient schemaRegistry, String StateChange) {
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources) {
 		this.uuid = uuid;
-		this.schemaRegistry = schemaRegistry;
-		sons = new HashMap<>();
+		this.stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
+		initSources(sources);
 		preferredSource = null;
-		stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
 		registerSchemas();
+	}
+	
+	private void initSources(List<SourceDescriptor> sources) {
+		sons = new HashMap<>();
+		for (SourceDescriptor source : sources) {
+			sons.put(source, null);
+		}
 	}
 
 	@Override
@@ -48,23 +48,13 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			for (SourceDescriptor e: sons.keySet())
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
-			String externalSystemID = data.get("externalSystemID").toString();
-			System.out.println("externalSystemID: " + externalSystemID);
-			String systemUUID = "";
-			for (SourceDescriptor e: sons.keySet()) {
-				System.out.println("SourceDescriptor: " + e);
-				if (e.getReportsId().equals(externalSystemID)) {
-					System.out.println("FOUND EXTERNAL ID: " + e + "   SystemID:" + e.getSystemUUID());
-					systemUUID = e.getSystemUUID();
-				}
-			}
-			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data, systemUUID);
+			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
 			preferredSource = sourceDescriptor;
 			sons.put(sourceDescriptor, data);
 			try {
 				GenericRecord guiUpdate = createUpdate();
 				return new ProducerRecord<String, Object>("update", guiUpdate);
-			} catch (IOException | RestClientException e) {
+			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();
 				throw new RuntimeException(e);
@@ -75,12 +65,21 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		}
 	}
 	
-	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data, String systemUUID) {
-		return new SourceDescriptor(topic, data.get("externalSystemID").toString(), systemUUID);
+	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data) {
+		String externalSystemID = data.get("externalSystemID").toString();
+		System.out.println("externalSystemID: " + externalSystemID);
+		for (SourceDescriptor e: sons.keySet()) {
+			System.out.println("SourceDescriptor: " + e);
+			if (e.getReportsId().equals(externalSystemID) && e.getSensorId().equals(topic)) {
+				System.out.println("FOUND EXTERNAL ID: " + e + "   SystemID:" + e.getSystemUUID());
+				return e;
+			}
+		}
+		throw new RuntimeException("Entity manager recieved report from a source that doesn't belong to it: " 
+				+ topic + ", " + externalSystemID);
 	}
 	
-	private GenericRecord createUpdate() throws IOException, RestClientException {
-		//TODO- verify meaning of entityID
+	private GenericRecord createUpdate() throws IOException {
 		List<GenericRecord> sonsRecords = new ArrayList<>();
 		for (SourceDescriptor sonKey : sons.keySet()) {
 			sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
@@ -91,16 +90,15 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				.set("sons", sonsRecords)
 				.set("stateChanges", stateChange)
 				.build();
-		if (isInitialStateSent) {
-			isInitialStateSent = true;
+		if (!stateChange.equals("NONE")) {
 			stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, "NONE");
 		}
 		return family;
 	}
 	
-	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate, String systemUUID) throws IOException, RestClientException {
+	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate, UUID systemUUID) throws IOException {
 		return new GenericRecordBuilder(SYSTEM_ENTITY_SCHEMA)
-				.set("entityID", systemUUID)
+				.set("entityID", systemUUID.toString())
 				.set("entityAttributes", latestUpdate)
 				.build();
 	}

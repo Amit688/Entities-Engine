@@ -27,7 +27,6 @@ import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Source;
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 
 
 /**
@@ -36,13 +35,11 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesEvent> {
     private Materializer materializer;
     private KafkaComponentsFactory componentsFactory;
-    private SchemaRegistryClient schemaRegistry;
     private Map<UUID, StreamDescriptor> streams;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
-        this.schemaRegistry = schemaRegistry;
         streams = new HashMap<>();
     }
 
@@ -71,13 +68,12 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     public void create(GenericRecord data) {
-    	UUID uuid = UUID.randomUUID();
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
-				uuid.toString());
+				UUID.randomUUID());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
-		createStream(sourceDescriptor, uuid, "NONE");
+		createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "NONE");
     }
     
     private void merge(GenericRecord data) {
@@ -90,7 +86,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		List<SourceDescriptor> sourceDescriptorsToMerge = killAndFlattenSources(uuidsToMerge);
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sourceDescriptorsToMerge)));
-    		createStream(mergedSource, sourceDescriptorsToMerge, uuidsToMerge.get(0), "MERGED");
+    		createStream(mergedSource, sourceDescriptorsToMerge, UUID.randomUUID(), "MERGED");
     	} else {
     		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
@@ -145,8 +141,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				createStream(sourceDescriptor, uuidToSplit, "SON_TAKEN");
 				first = false;
 			} else {
-				UUID uuid = UUID.randomUUID();
-				createStream(sourceDescriptor, uuid, "WAS_SPLIT");
+				createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "WAS_SPLIT");
 			}
     	}
     }
@@ -158,7 +153,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, schemaRegistry, stateChange);
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))

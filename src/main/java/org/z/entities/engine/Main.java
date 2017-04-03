@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 
-import kamon.Kamon;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -76,7 +75,7 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 		
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory, schemaRegistry);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
 		combinedSource
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);
