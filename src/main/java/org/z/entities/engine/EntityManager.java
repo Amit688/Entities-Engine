@@ -46,13 +46,18 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
 			for (SourceDescriptor e: sons.keySet())
-				System.out.println(e.getSystemUUID());
+				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
 			String externalSystemID = data.get("externalSystemID").toString();
+			System.out.println("externalSystemID: " + externalSystemID);
 			String systemUUID = "";
-			for (SourceDescriptor e: sons.keySet())
-				if (e.getReportsId().equals(externalSystemID))
+			for (SourceDescriptor e: sons.keySet()) {
+				System.out.println("SourceDescriptor: " + e);
+				if (e.getReportsId().equals(externalSystemID)) {
+					System.out.println("FOUND EXTERNAL ID: " + e + "   SystemID:" + e.getSystemUUID());
 					systemUUID = e.getSystemUUID();
+				}
+			}
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data, systemUUID);
 			preferredSource = sourceDescriptor;
 			sons.put(sourceDescriptor, data);

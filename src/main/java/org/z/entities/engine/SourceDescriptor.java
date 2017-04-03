@@ -1,21 +1,17 @@
 package org.z.entities.engine;
 
-import java.util.UUID;
-
 public class SourceDescriptor {
 	private String systemUUID;
 	private String sensorId;
 	private String reportsId;
 	
 	public SourceDescriptor(String sensorId, String reportsId, String uuid) {
-		this.systemUUID = uuid;
 		this.sensorId = sensorId;
 		this.reportsId = reportsId;
+		this.systemUUID = uuid;
 	}
 
-	public String getSensorId() {
-		return sensorId;
-	}
+	public String getSensorId() { return sensorId;}
 
 	public String getReportsId() { return reportsId; }
 
