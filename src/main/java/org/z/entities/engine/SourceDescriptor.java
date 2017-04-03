@@ -1,10 +1,14 @@
 package org.z.entities.engine;
 
+import java.util.UUID;
+
 public class SourceDescriptor {
+	private String systemUUID;
 	private String sensorId;
 	private String reportsId;
 	
-	public SourceDescriptor(String sensorId, String reportsId) {
+	public SourceDescriptor(String sensorId, String reportsId, String uuid) {
+		this.systemUUID = uuid;
 		this.sensorId = sensorId;
 		this.reportsId = reportsId;
 	}
@@ -13,9 +17,9 @@ public class SourceDescriptor {
 		return sensorId;
 	}
 
-	public String getReportsId() {
-		return reportsId;
-	}
+	public String getReportsId() { return reportsId; }
+
+	public String getSystemUUID() { return systemUUID; }
 
 	@Override
 	public int hashCode() {
@@ -57,6 +61,6 @@ public class SourceDescriptor {
 
 	@Override
 	public String toString() {
-		return "TopicDescriptor [sensorId=" + sensorId + ", reportsId=" + reportsId + "]";
+		return "TopicDescriptor [sensorId=" + sensorId + ", reportsId=" + reportsId + ", systemUUID=" + systemUUID + "]";
 	}
 }

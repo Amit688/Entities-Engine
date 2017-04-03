@@ -71,11 +71,13 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     public void create(GenericRecord data) {
+    	UUID uuid = UUID.randomUUID();
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
-				data.get("externalSystemID").toString());
+				data.get("externalSystemID").toString(),
+				uuid.toString());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
-		createStream(sourceDescriptor);
+		createStream(sourceDescriptor, uuid, "NONE");
     }
     
     private void merge(GenericRecord data) {
@@ -88,7 +90,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		List<SourceDescriptor> sourceDescriptorsToMerge = killAndFlattenSources(uuidsToMerge);
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sourceDescriptorsToMerge)));
-    		createStream(mergedSource, sourceDescriptorsToMerge);
+    		createStream(mergedSource, sourceDescriptorsToMerge, UUID.randomUUID(), "MERGED");
     	} else {
     		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
@@ -128,7 +130,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 	}
     
     private void split(GenericRecord data) {
-    	String idToSplit = data.get("splitedEntityID").toString();
+    	String idToSplit = data.get("splittedEntityID").toString();
     	UUID uuidToSplit = UUID.fromString(idToSplit);
 		System.out.println("got split event for: " + uuidToSplit.toString());
     	StreamDescriptor splittedStream = streams.remove(uuidToSplit);
@@ -137,19 +139,26 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	}
     	
     	stopStream(splittedStream);
+		Boolean first = true;
     	for (SourceDescriptor sourceDescriptor : splittedStream.getSourceDescriptors()) {
-    		createStream(sourceDescriptor);
+    		if (first) {
+				createStream(sourceDescriptor, uuidToSplit, "SON_TAKEN");
+				first = false;
+			} else {
+				UUID uuid = UUID.randomUUID();
+				createStream(sourceDescriptor, uuid, "WAS_SPLIT");
+			}
     	}
     }
     
-    private void createStream(SourceDescriptor sourceDescriptor) {
-    	createStream(componentsFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor));
+    private void createStream(SourceDescriptor sourceDescriptor, UUID uuid, String stateChange) {
+    	createStream(componentsFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor), uuid,
+				stateChange);
     }
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
-			List<SourceDescriptor> sourceDescriptors) {
-		UUID uuid = UUID.randomUUID();
-    	EntityManager entityManager = new EntityManager(uuid, schemaRegistry);
+			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
+    	EntityManager entityManager = new EntityManager(uuid, schemaRegistry, stateChange);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
@@ -160,7 +169,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	streams.put(uuid, 
     			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
 	}
-    
+
     private void stopStream(StreamDescriptor stream) {
     	stream.getKillSwitch().shutdown();
     }
