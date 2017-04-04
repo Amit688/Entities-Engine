@@ -50,10 +50,11 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			GenericRecord data = (GenericRecord) record.value();
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
 			preferredSource = sourceDescriptor;
+			((GenericRecord) data.get("basicAttributes")).put("entityOffset", record.offset());
 			sons.put(sourceDescriptor, data);
 			try {
 				GenericRecord guiUpdate = createUpdate();
-				return new ProducerRecord<String, Object>("update", guiUpdate);
+				return new ProducerRecord<String, Object>("update", sourceDescriptor.getSystemUUID().toString(), guiUpdate);
 			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();

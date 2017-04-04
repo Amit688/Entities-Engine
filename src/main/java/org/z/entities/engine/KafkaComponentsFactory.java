@@ -51,6 +51,16 @@ public class KafkaComponentsFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, long offset) {
+		ConsumerSettings<String, Object> consumerSettings = 
+    			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
+    			.withBootstrapServers(kafkaUrl)
+    			.withGroupId("group1")
+    			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return Consumer.plainSource(consumerSettings, 
+        		Subscriptions.assignmentWithOffset(new TopicPartition(topic, 0), offset));
+	}
+	
 	/**
 	 * Creates a source that filters its messages by a reportId
 	 * 
