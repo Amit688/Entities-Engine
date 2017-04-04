@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: super-best-engine
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: super-best-engine
+      labels:
+        app: super-best-engine
+    spec:
+      containers:
+      - name: super-best-engine
+        image: docker.io/amit688/entities-engine
+        env:
+        - name: KAFKA_ADDRESS
+          value: kafka.kafka:9092
+        - name: SCHEMA_REGISTRY_ADDRESS
+          value: http://schema-registry.kafka:8081
+        - name: SCHEMA_REGISTRY_IDENTITY
+          value: "2010"
