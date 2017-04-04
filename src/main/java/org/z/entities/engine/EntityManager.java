@@ -28,15 +28,30 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources) {
 		this.uuid = uuid;
 		this.stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
-		initSources(sources);
+		initSons(sources);
 		preferredSource = null;
 		registerSchemas();
 	}
 	
-	private void initSources(List<SourceDescriptor> sources) {
+	private void initSons(List<SourceDescriptor> sources) {
 		sons = new HashMap<>();
 		for (SourceDescriptor source : sources) {
 			sons.put(source, null);
+		}
+	}
+	
+	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+		this.uuid = uuid;
+		this.stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
+		initSons(sonsAttributes);
+		preferredSource = null;
+		registerSchemas();
+	}
+	
+	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+		sons = new HashMap<>();
+		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
+			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
 		}
 	}
 
@@ -48,7 +63,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			for (SourceDescriptor e: sons.keySet())
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
-			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
+			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
 			((GenericRecord) data.get("basicAttributes")).put("entityOffset", record.offset());
 			sons.put(sourceDescriptor, data);
@@ -66,18 +81,19 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		}
 	}
 	
-	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data) {
+	private SourceDescriptor getSourceDescriptor(GenericRecord data) {
 		String externalSystemID = data.get("externalSystemID").toString();
-		System.out.println("externalSystemID: " + externalSystemID);
+		String sourceName = data.get("sourceName").toString();
+		System.out.println("externalSystemID: " + externalSystemID + ", sourceName: " + sourceName);
 		for (SourceDescriptor e: sons.keySet()) {
 			System.out.println("SourceDescriptor: " + e);
-			if (e.getReportsId().equals(externalSystemID) && e.getSensorId().equals(topic)) {
+			if (e.getReportsId().equals(externalSystemID) && e.getSensorId().equals(sourceName)) {
 				System.out.println("FOUND EXTERNAL ID: " + e + "   SystemID:" + e.getSystemUUID());
 				return e;
 			}
 		}
 		throw new RuntimeException("Entity manager recieved report from a source that doesn't belong to it: " 
-				+ topic + ", " + externalSystemID);
+				+ sourceName + ", " + externalSystemID);
 	}
 	
 	private GenericRecord createUpdate() throws IOException {
@@ -134,7 +150,8 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 					+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
 					+ "{\"name\": \"height\",\"type\": \"double\"},"
 					+ "{\"name\": \"nickname\",\"type\": \"string\"},"
-					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
+					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"},"
+					+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
 				+ "]}");
 		if (SYSTEM_ENTITY_SCHEMA == null) {
 			SYSTEM_ENTITY_SCHEMA = parser.parse("{\"type\": \"record\", "

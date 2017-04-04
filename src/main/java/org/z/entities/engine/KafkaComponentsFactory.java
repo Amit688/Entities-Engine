@@ -73,6 +73,10 @@ public class KafkaComponentsFactory {
 		return createSource(topic).filter(record -> filterByReportsId(record, reportsId));
 	}
 	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, String reportsId, long offset) {
+		return createSource(topic, offset).filter(record -> filterByReportsId(record, reportsId));
+	}
+	
 	private boolean filterByReportsId(ConsumerRecord<String, Object> incomingUpdate, String reportsId) {
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
@@ -87,6 +91,10 @@ public class KafkaComponentsFactory {
 	 */
 	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor) {
 		return createSource(descriptor.getSensorId(), descriptor.getReportsId());
+	}
+	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor, long offset) {
+		return createSource(descriptor.getSensorId(), descriptor.getReportsId(), offset);
 	}
 	
 	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> createSink() {

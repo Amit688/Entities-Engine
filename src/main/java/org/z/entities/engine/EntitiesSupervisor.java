@@ -79,47 +79,71 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void merge(GenericRecord data) {
 		@SuppressWarnings("unchecked")  // From schema
-		List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
-    	List<UUID> uuidsToMerge = toUUIDs(idsToMerge);
+		List<GenericRecord> familiesToMerge = (List<GenericRecord>) data.get("mergedFamilies");
+		List<UUID> uuidsToMerge = getUUIDs(familiesToMerge);
 		System.out.println("got merge event for:");
 		uuidsToMerge.forEach(System.out::println);
     	if (streams.keySet().containsAll(uuidsToMerge)) {
-    		List<SourceDescriptor> sourceDescriptorsToMerge = killAndFlattenSources(uuidsToMerge);
+    		Map<SourceDescriptor, GenericRecord> sonsAttributesToMerge = killAndFlattenSonsAttributes(familiesToMerge);
     		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource = 
-    				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sourceDescriptorsToMerge)));
-    		createStream(mergedSource, sourceDescriptorsToMerge, UUID.randomUUID(), "MERGED");
+    				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sonsAttributesToMerge)));
+    		createStream(mergedSource, sonsAttributesToMerge, UUID.randomUUID(), "MERGED");
     	} else {
     		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
     		throw new RuntimeException("tried to merge non existent entities: " + debugString);
     	}
     }
-
-	private List<UUID> toUUIDs(List<Utf8> ids) {
-    	List<UUID> uuids = new ArrayList<>(ids.size());
-    	for (Utf8 id : ids) {
-    		uuids.add(UUID.fromString(id.toString()));
+    
+    private List<UUID> getUUIDs(List<GenericRecord> families) {
+    	List<UUID> uuids = new ArrayList<>(families.size());
+    	for (GenericRecord family : families) {
+    		uuids.add(getUUID(family));
     	}
     	return uuids;
     }
 	
-	private List<SourceDescriptor> killAndFlattenSources(List<UUID> uuidsToKill) {
-		List<SourceDescriptor> sources = new ArrayList<>(streams.size());
-		for (UUID uuid : uuidsToKill) {
+	private Map<SourceDescriptor, GenericRecord> killAndFlattenSonsAttributes(List<GenericRecord> familiesToKill) {
+		Map<SourceDescriptor, GenericRecord> sons = new HashMap<>(familiesToKill.size());
+		for (GenericRecord family : familiesToKill) {
+			UUID uuid = getUUID(family);
 			StreamDescriptor stream = streams.remove(uuid);
 			stopStream(stream);
-			sources.addAll(stream.getSourceDescriptors());
+			collectSons(family, sons);
 		}
-		return sources;
+		return sons;
+	}
+	
+	private UUID getUUID(GenericRecord family) {
+		return UUID.fromString(family.get("entityID").toString());
+	}
+	
+	private void collectSons(GenericRecord family, Map<SourceDescriptor, GenericRecord> collector) {
+		@SuppressWarnings("unchecked")
+		List<GenericRecord> familySons = (List<GenericRecord>) family.get("sons");
+		for (GenericRecord son : familySons) {
+			SourceDescriptor source = getSourceDescriptor(son);
+			GenericRecord sonAttributes = (GenericRecord) son.get("generalEntityAttributes");
+			collector.put(source, sonAttributes);
+		}
+	}
+	
+	private SourceDescriptor getSourceDescriptor(GenericRecord son) {
+		UUID uuid = UUID.fromString(son.get("entityID").toString());
+		GenericRecord attributes = (GenericRecord) son.get("entityAttributes");
+		String externalSystemID = attributes.get("externalSystemID").toString();
+		String sourceName = attributes.get("sourceName").toString();
+		return new SourceDescriptor(sourceName, externalSystemID, uuid);
 	}
 	
 	private SourceShape<ConsumerRecord<String, Object>> createMergedSourceGraph(
-			Builder<NotUsed> builder, List<SourceDescriptor> sourceDescriptors) {
+			Builder<NotUsed> builder, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
 		UniformFanInShape<ConsumerRecord<String, Object>, ConsumerRecord<String, Object>> merger = 
-				builder.add(Merge.create(sourceDescriptors.size()));
+				builder.add(Merge.create(sonsAttributes.size()));
 		
-		for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.createSource(sourceDescriptor);
+		for (Map.Entry<SourceDescriptor, GenericRecord> entry : sonsAttributes.entrySet()) {
+			Long offset = (Long) ((GenericRecord) entry.getValue().get("basicAttributes")).get("entityOffset");
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.createSource(entry.getKey(), offset);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -164,6 +188,20 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	System.out.println("storing stream descriptor for later use");
     	streams.put(uuid, 
     			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
+	}
+    
+    private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
+			Map<SourceDescriptor, GenericRecord> sonsAttributes, UUID uuid, String stateChange) {
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sonsAttributes);
+    	UniqueKillSwitch killSwitch = source
+    			.viaMat(KillSwitches.single(), Keep.right())
+    			.via(Flow.fromFunction(entityManager::apply))
+    			.to(componentsFactory.createSink())
+    			.run(materializer);
+    	
+    	System.out.println("storing stream descriptor for later use");
+    	streams.put(uuid, 
+    			new StreamDescriptor(killSwitch, uuid, new ArrayList<>(sonsAttributes.keySet())));
 	}
 
     private void stopStream(StreamDescriptor stream) {
