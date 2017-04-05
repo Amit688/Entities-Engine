@@ -83,7 +83,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	private SourceDescriptor getSourceDescriptor(GenericRecord data) {
 		String externalSystemID = data.get("externalSystemID").toString();
-		String sourceName = data.get("sourceName").toString();
+		String sourceName = ((GenericRecord) data.get("basicAttributes")).get("sourceName").toString();
 		System.out.println("externalSystemID: " + externalSystemID + ", sourceName: " + sourceName);
 		for (SourceDescriptor e: sons.keySet()) {
 			System.out.println("SourceDescriptor: " + e);
@@ -135,7 +135,8 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 								+ "{\"name\": \"long\",\"type\": \"double\"}"
 							+ "]}},"
 					+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
-					+ "{\"name\": \"entityOffset\",\"type\": \"long\"}"
+					+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
+					+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
 				+ "]}");
 		parser.parse("{\"type\": \"record\", "
 				+ "\"name\": \"generalEntityAttributes\","
@@ -150,8 +151,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 					+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
 					+ "{\"name\": \"height\",\"type\": \"double\"},"
 					+ "{\"name\": \"nickname\",\"type\": \"string\"},"
-					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"},"
-					+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
+					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
 				+ "]}");
 		if (SYSTEM_ENTITY_SCHEMA == null) {
 			SYSTEM_ENTITY_SCHEMA = parser.parse("{\"type\": \"record\", "
