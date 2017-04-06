@@ -322,6 +322,46 @@ public class Main {
     
     private static void registerSchemas(SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
     	Schema.Parser parser = new Schema.Parser();
+		schemaRegistry.register("detectionEvent",
+				parser.parse("{\"type\": \"record\", "
+						+ "\"name\": \"detectionEvent\", "
+						+ "\"doc\": \"This is a schema for entity detection report event\", "
+						+ "\"fields\": ["
+						+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, "
+						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+						+ "]}"));
+		schemaRegistry.register("basicEntityAttributes",
+				parser.parse("{\"type\": \"record\","
+						+ "\"name\": \"basicEntityAttributes\","
+						+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
+						+ "\"fields\": ["
+						+ "{\"name\": \"coordinate\", \"type\":"
+						+ "{\"type\": \"record\","
+						+ "\"name\": \"coordinate\","
+						+ "\"doc\": \"Location attribute in grid format\","
+						+ "\"fields\": ["
+						+ "{\"name\": \"lat\",\"type\": \"double\"},"
+						+ "{\"name\": \"long\",\"type\": \"double\"}"
+						+ "]}},"
+						+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
+						+ "{\"name\": \"entityOffset\",\"type\": \"long\"}"
+						+ "]}"));
+		schemaRegistry.register("generalEntityAttributes",
+				parser.parse("{\"type\": \"record\", "
+						+ "\"name\": \"generalEntityAttributes\","
+						+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
+						+ "\"fields\": ["
+						+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
+						+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
+						+ "{\"name\": \"elevation\",\"type\": \"double\"},"
+						+ "{\"name\": \"course\",\"type\": \"double\"},"
+						+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
+						+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
+						+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
+						+ "{\"name\": \"height\",\"type\": \"double\"},"
+						+ "{\"name\": \"nickname\",\"type\": \"string\"},"
+						+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
+						+ "]}"));
     	schemaRegistry.register("systemEntity", 
     			parser.parse("{\"type\": \"record\", "
 	        				+ "\"name\": \"systemEntity\","
