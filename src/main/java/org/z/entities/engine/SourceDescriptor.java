@@ -1,21 +1,23 @@
 package org.z.entities.engine;
 
+import java.util.UUID;
+
 public class SourceDescriptor {
+	private UUID systemUUID;
 	private String sensorId;
 	private String reportsId;
 	
-	public SourceDescriptor(String sensorId, String reportsId) {
+	public SourceDescriptor(String sensorId, String reportsId, UUID uuid) {
 		this.sensorId = sensorId;
 		this.reportsId = reportsId;
+		this.systemUUID = uuid;
 	}
 
-	public String getSensorId() {
-		return sensorId;
-	}
+	public String getSensorId() { return sensorId;}
 
-	public String getReportsId() {
-		return reportsId;
-	}
+	public String getReportsId() { return reportsId; }
+
+	public UUID getSystemUUID() { return systemUUID; }
 
 	@Override
 	public int hashCode() {
@@ -23,6 +25,7 @@ public class SourceDescriptor {
 		int result = 1;
 		result = prime * result + ((reportsId == null) ? 0 : reportsId.hashCode());
 		result = prime * result + ((sensorId == null) ? 0 : sensorId.hashCode());
+		result = prime * result + ((systemUUID == null) ? 0 : systemUUID.hashCode());
 		return result;
 	}
 
@@ -52,11 +55,18 @@ public class SourceDescriptor {
 		} else if (!sensorId.equals(other.sensorId)) {
 			return false;
 		}
+		if (systemUUID == null) {
+			if (other.systemUUID != null) {
+				return false;
+			}
+		} else if (!systemUUID.equals(other.systemUUID)) {
+			return false;
+		}
 		return true;
 	}
 
 	@Override
 	public String toString() {
-		return "TopicDescriptor [sensorId=" + sensorId + ", reportsId=" + reportsId + "]";
+		return "TopicDescriptor [sensorId=" + sensorId + ", reportsId=" + reportsId + ", systemUUID=" + systemUUID.toString() + "]";
 	}
 }

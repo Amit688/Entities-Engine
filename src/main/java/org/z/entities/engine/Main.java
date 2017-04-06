@@ -10,7 +10,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.z.entities.engine.EntitiesEvent.Type;
 
 import akka.Done;
 import akka.NotUsed;
@@ -32,7 +31,6 @@ import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
-
 /**
  * Created by Amit on 20/03/2017.
  */
@@ -75,7 +73,7 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 		
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory, schemaRegistry);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
 		combinedSource
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);

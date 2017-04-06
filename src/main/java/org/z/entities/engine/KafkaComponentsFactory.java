@@ -51,6 +51,16 @@ public class KafkaComponentsFactory {
         		Subscriptions.assignment(new TopicPartition(topic, 0)));
 	}
 	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, long offset) {
+		ConsumerSettings<String, Object> consumerSettings =
+    			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
+    			.withBootstrapServers(kafkaUrl)
+    			.withGroupId("group1")
+    			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return Consumer.plainSource(consumerSettings,
+        		Subscriptions.assignmentWithOffset(new TopicPartition(topic, 0), offset));
+	}
+
 	/**
 	 * Creates a source that filters its messages by a reportId
 	 * 
@@ -63,6 +73,10 @@ public class KafkaComponentsFactory {
 		return createSource(topic).filter(record -> filterByReportsId(record, reportsId));
 	}
 	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, String reportsId, long offset) {
+		return createSource(topic, offset).filter(record -> filterByReportsId(record, reportsId));
+	}
+
 	private boolean filterByReportsId(ConsumerRecord<String, Object> incomingUpdate, String reportsId) {
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
@@ -79,6 +93,10 @@ public class KafkaComponentsFactory {
 		return createSource(descriptor.getSensorId(), descriptor.getReportsId());
 	}
 	
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor, long offset) {
+		return createSource(descriptor.getSensorId(), descriptor.getReportsId(), offset);
+	}
+
 	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> createSink() {
 		ProducerSettings<String, Object> producerSettings = ProducerSettings
 				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))

@@ -14,24 +14,43 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
 	private static Schema ENTITY_FAMILY_SCHEMA = null;
 	
 	private UUID uuid;
-	private SchemaRegistryClient schemaRegistry;
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
-	
-	public EntityManager(UUID uuid, SchemaRegistryClient schemaRegistry) {
+	private String stateChange;
+
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources) {
 		this.uuid = uuid;
-		this.schemaRegistry = schemaRegistry;
-		sons = new HashMap<>();
+		this.stateChange = StateChange;
+		initSons(sources);
 		preferredSource = null;
 		registerSchemas();
+	}
+
+	private void initSons(List<SourceDescriptor> sources) {
+		sons = new HashMap<>();
+		for (SourceDescriptor source : sources) {
+			sons.put(source, null);
+		}
+	}
+
+	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+		this.uuid = uuid;
+		this.stateChange = StateChange;
+		initSons(sonsAttributes);
+		preferredSource = null;
+		registerSchemas();
+	}
+
+	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+		sons = new HashMap<>();
+		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
+			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
+		}
 	}
 
 	@Override
@@ -40,15 +59,15 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
 			for (SourceDescriptor e: sons.keySet())
-				System.out.println(e.getReportsId());
+				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
-			SourceDescriptor sourceDescriptor = getSourceDescriptor(record.topic(), data);
+			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
 			sons.put(sourceDescriptor, data);
 			try {
 				GenericRecord guiUpdate = createUpdate();
-				return new ProducerRecord<String, Object>("update", guiUpdate);
-			} catch (IOException | RestClientException e) {
+				return new ProducerRecord<String, Object>("update", sourceDescriptor.getSystemUUID().toString(), guiUpdate);
+			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();
 				throw new RuntimeException(e);
@@ -59,27 +78,41 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		}
 	}
 	
-	private SourceDescriptor getSourceDescriptor(String topic, GenericRecord data) {
-		return new SourceDescriptor(topic, data.get("externalSystemID").toString());
+	private SourceDescriptor getSourceDescriptor(GenericRecord data) {
+		String externalSystemID = data.get("externalSystemID").toString();
+		String sourceName = ((GenericRecord) data.get("basicAttributes")).get("sourceName").toString();
+		System.out.println("externalSystemID: " + externalSystemID + ", sourceName: " + sourceName);
+		for (SourceDescriptor e: sons.keySet()) {
+			System.out.println("SourceDescriptor: " + e);
+			if (e.getReportsId().equals(externalSystemID) && e.getSensorId().equals(sourceName)) {
+				System.out.println("FOUND EXTERNAL ID: " + e + "   SystemID:" + e.getSystemUUID());
+				return e;
+			}
+		}
+		throw new RuntimeException("Entity manager received report from a source that doesn't belong to it: "
+				+ sourceName + ", " + externalSystemID);
 	}
 	
-	private GenericRecord createUpdate() throws IOException, RestClientException {
-		//TODO- verify meaning of entityID
+	private GenericRecord createUpdate() throws IOException {
 		List<GenericRecord> sonsRecords = new ArrayList<>();
-		for (GenericRecord son : sons.values()) {
-			sonsRecords.add(createSingleEntityUpdate(son));
+		for (SourceDescriptor sonKey : sons.keySet()) {
+			sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
 		}
 		GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
 				.set("entityID", uuid.toString())
 				.set("entityAttributes", sons.get(preferredSource))
 				.set("sons", sonsRecords)
+				.set("stateChanges", stateChange)
 				.build();
+		if (!stateChange.equals("NONE")) {
+			stateChange = "NONE";
+		}
 		return family;
 	}
 	
-	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate) throws IOException, RestClientException {
+	private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate, UUID systemUUID) throws IOException {
 		return new GenericRecordBuilder(SYSTEM_ENTITY_SCHEMA)
-				.set("entityID", uuid.toString())
+				.set("entityID", systemUUID.toString())
 				.set("entityAttributes", latestUpdate)
 				.build();
 	}
@@ -99,7 +132,8 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 								+ "{\"name\": \"long\",\"type\": \"double\"}"
 							+ "]}},"
 					+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
-					+ "{\"name\": \"entityOffset\",\"type\": \"long\"}"
+					+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
+					+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
 				+ "]}");
 		parser.parse("{\"type\": \"record\", "
 				+ "\"name\": \"generalEntityAttributes\","
@@ -131,6 +165,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
     				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
     				+ "\"fields\": ["
     					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
+						+ "{\"name\": \"stateChanges\",\"type\": \"string\"},"
 						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
 						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 					+ "]}");
