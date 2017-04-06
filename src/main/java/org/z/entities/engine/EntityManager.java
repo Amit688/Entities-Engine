@@ -18,16 +18,15 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
 	private static Schema ENTITY_FAMILY_SCHEMA = null;
-	private static Schema STATE_CHANGES_SCHEMA = null;
-	
+
 	private UUID uuid;
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
-	private GenericData.EnumSymbol stateChange;
+	private String stateChange;
 	
 	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources) {
 		this.uuid = uuid;
-		this.stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
+		this.stateChange = StateChange;
 		initSons(sources);
 		preferredSource = null;
 		registerSchemas();
@@ -42,7 +41,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
 		this.uuid = uuid;
-		this.stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, StateChange);
+		this.stateChange = StateChange;
 		initSons(sonsAttributes);
 		preferredSource = null;
 		registerSchemas();
@@ -92,7 +91,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				return e;
 			}
 		}
-		throw new RuntimeException("Entity manager recieved report from a source that doesn't belong to it: " 
+		throw new RuntimeException("Entity manager received report from a source that doesn't belong to it: "
 				+ sourceName + ", " + externalSystemID);
 	}
 	
@@ -108,7 +107,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				.set("stateChanges", stateChange)
 				.build();
 		if (!stateChange.equals("NONE")) {
-			stateChange = new GenericData.EnumSymbol(STATE_CHANGES_SCHEMA, "NONE");
+			stateChange = "NONE";
 		}
 		return family;
 	}
@@ -162,18 +161,13 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
 					+ "]}");
 		}
-		if (STATE_CHANGES_SCHEMA == null) {
-			STATE_CHANGES_SCHEMA = parser.parse("{\"type\": \"enum\", "
-					+ "\"name\": \"stateChanges\", "
-					+ "\"symbols\":[\"MERGED\", \"WAS_SPLIT\", \"SON_TAKEN\", \"NONE\"]}");
-		}
 		if (ENTITY_FAMILY_SCHEMA == null) {
 			ENTITY_FAMILY_SCHEMA = parser.parse("{\"type\": \"record\", "
     				+ "\"name\": \"entityFamily\", "
     				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
     				+ "\"fields\": ["
     					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-						+ "{\"name\": \"stateChanges\",\"type\": \"stateChanges\"},"
+						+ "{\"name\": \"stateChanges\",\"type\": \"string\"},"
 						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
 						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 					+ "]}");
