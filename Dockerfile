@@ -1,10 +1,14 @@
-FROM openjdk:8-alpine
+FROM gradle:jdk8-alpine
 
-WORKDIR /usr/local
-ADD https://github.com/Amit688/Entities-Engine/releases/download/0.0.1/testing.tar .
-RUN tar -xvf testing.tar
+RUN mkdir -p /home/gradle/src
+WORKDIR /home/gradle/src
+
+COPY . /home/gradle/src
+RUN gradle build
 
 ENV KAFKA_ADDRESS "localhost:9092"
 
-WORKDIR /usr/local/testing/lib/
+RUN tar -xvf build/distributions/testing.tar
+
+WORKDIR /home/gradle/src/testing/lib
 CMD java -cp "*" org.z.entities.engine.Main
