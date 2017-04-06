@@ -37,7 +37,6 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-//		Kamon.start();
     	System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
 		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
@@ -53,7 +52,6 @@ public class Main {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
-//				Kamon.shutdown();
 			}
 		});
 		System.out.println("Ready");
