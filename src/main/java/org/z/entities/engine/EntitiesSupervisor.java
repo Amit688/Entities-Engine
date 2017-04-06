@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,11 +37,13 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private Materializer materializer;
     private KafkaComponentsFactory componentsFactory;
     private Map<UUID, StreamDescriptor> streams;
+    private SchemaRegistryClient schemaRegistry;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
         streams = new HashMap<>();
+        this.schemaRegistry = schemaRegistry;
     }
 
     @Override
@@ -178,7 +181,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors);
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))

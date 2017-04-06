@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -22,11 +23,13 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
 	private String stateChange;
+	private SchemaRegistryClient schemaRegistry;
 
-	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources) {
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
 		initSons(sources);
+		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
 		registerSchemas();
 	}
