@@ -69,8 +69,9 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     public void create(GenericRecord data) {
+    	System.out.println("DATA IS: \n" + data.toString());
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
-				((GenericRecord) data.get("basicAttributes")).get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
+				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
 				UUID.randomUUID());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
