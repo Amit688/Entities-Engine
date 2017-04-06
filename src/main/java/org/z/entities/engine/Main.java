@@ -46,7 +46,7 @@ public class Main {
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
 		
-		registerSchemas(schemaRegistry);
+//		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -376,7 +376,6 @@ public class Main {
 	        				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
 	        				+ "\"fields\": ["
 	        					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-								+ "{\"name\": \"stateChanges\",\"type\": \"string\"},"
 	    						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
 	    						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 	    					+ "]}"));

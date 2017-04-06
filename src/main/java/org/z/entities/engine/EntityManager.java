@@ -106,7 +106,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				.set("entityID", uuid.toString())
 				.set("entityAttributes", sons.get(preferredSource))
 				.set("sons", sonsRecords)
-				.set("stateChanges", stateChange)
+//				.set("stateChanges", stateChange)
 				.build();
 		if (!stateChange.equals("NONE")) {
 			stateChange = "NONE";
@@ -169,7 +169,6 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
     				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
     				+ "\"fields\": ["
     					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-						+ "{\"name\": \"stateChanges\",\"type\": \"string\"},"
 						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
 						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 					+ "]}");
