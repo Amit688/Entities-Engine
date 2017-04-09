@@ -77,7 +77,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			try {
 				GenericRecord guiUpdate = createUpdate();
 				System.out.print("GUI UPDATE:\n" + guiUpdate);
-				return new ProducerRecord<String, Object>("update", uuid.toString(), guiUpdate);
+				return new ProducerRecord<String, Object>("update", guiUpdate);
 			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();
