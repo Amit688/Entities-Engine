@@ -2,6 +2,7 @@ package org.z.entities.engine;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,14 +11,21 @@ import java.util.function.Function;
 
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericData.EnumSymbol;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
+	private static Schema BASIC_ATTRIBUTES__SCHEMA = null;
+	private static Schema GENERAL_ATTRIBUTES__SCHEMA = null;
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
 	private static Schema ENTITY_FAMILY_SCHEMA = null;
+	static {
+		registerSchemas();
+	}
 	
 	private UUID uuid;
 	private Map<SourceDescriptor, GenericRecord> sons;
@@ -31,7 +39,6 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		initSons(sources);
 		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
-		registerSchemas();
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
@@ -46,7 +53,6 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		this.stateChange = StateChange;
 		initSons(sonsAttributes);
 		preferredSource = null;
-		registerSchemas();
 	}
 
 	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
@@ -66,11 +72,12 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			GenericRecord data = (GenericRecord) record.value();
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
-			sons.put(sourceDescriptor, data);
+			GenericRecord sonAttributes = convertGeneralAttributes(data);
+			sons.put(sourceDescriptor, sonAttributes);
 			try {
 				GenericRecord guiUpdate = createUpdate();
 				System.out.print("GUI UPDATE:\n" + guiUpdate);
-				return new ProducerRecord<String, Object>("update", sourceDescriptor.getSystemUUID().toString(), guiUpdate);
+				return new ProducerRecord<String, Object>("update", uuid.toString(), guiUpdate);
 			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();
@@ -97,6 +104,39 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				+ sourceName + ", " + externalSystemID);
 	}
 	
+	private GenericRecord convertGeneralAttributes(GenericRecord data) {
+		EnumSymbol category = convertEnum((GenericData.EnumSymbol) data.get("category"), 
+				GENERAL_ATTRIBUTES__SCHEMA.getField("category").schema());
+		EnumSymbol nationality = convertEnum((GenericData.EnumSymbol) data.get("nationality"), 
+				GENERAL_ATTRIBUTES__SCHEMA.getField("nationality").schema());
+		GenericRecordBuilder builder = new GenericRecordBuilder(GENERAL_ATTRIBUTES__SCHEMA)
+				.set("basicAttributes", convertBasicAttributes((GenericRecord) data.get("basicAttributes")))
+				.set("category", category)
+				.set("nationality", nationality);
+		copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID"));
+		return builder.build();
+	}
+	
+	private GenericRecord convertBasicAttributes(GenericRecord data) {
+		GenericRecord coordinateData = (GenericRecord) data.get("coordinate");
+		GenericRecordBuilder coordinateBuilder = new GenericRecordBuilder(BASIC_ATTRIBUTES__SCHEMA.getField("coordinate").schema());
+		copyFields(coordinateData, coordinateBuilder, Arrays.asList("lat", "long"));
+		GenericRecordBuilder builder = new GenericRecordBuilder(BASIC_ATTRIBUTES__SCHEMA)
+				.set("coordinate", coordinateBuilder.build());
+		copyFields(data, builder, Arrays.asList("isNotTracked", "entityOffset", "sourceName"));
+		return builder.build();
+	}
+	
+	private void copyFields(GenericRecord source, GenericRecordBuilder destination, List<String> fields) {
+		for (String field : fields) {
+			destination.set(field, source.get(field));
+		}
+	}
+	
+	private GenericData.EnumSymbol convertEnum(GenericData.EnumSymbol source, Schema targetSchema) {
+		return new GenericData.EnumSymbol(targetSchema, source.toString());
+	}
+	
 	private GenericRecord createUpdate() throws IOException {
 		List<GenericRecord> sonsRecords = new ArrayList<>();
 		for (SourceDescriptor sonKey : sons.keySet()) {
@@ -121,10 +161,10 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				.build();
 	}
 	
-	private void registerSchemas() {
+	private static void registerSchemas() {
 		Schema.Parser parser = new Schema.Parser();
 		parser.parse("{\"type\": \"record\","
-				+ "\"name\": \"basicEntityAttributes\","
+				+ "\"name\": \"basicSystemEntityAttributes\","
 				+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
 				+ "\"fields\": ["
 					+ "{\"name\": \"coordinate\", \"type\":"
@@ -139,8 +179,8 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 					+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
 					+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
 				+ "]}");
-		parser.parse("{\"type\": \"record\", "
-				+ "\"name\": \"generalEntityAttributes\","
+		GENERAL_ATTRIBUTES__SCHEMA = parser.parse("{\"type\": \"record\", "
+				+ "\"name\": \"generalSystemEntityAttributes\","
 				+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
 				+ "\"fields\": ["
 					+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
@@ -154,25 +194,21 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 					+ "{\"name\": \"nickname\",\"type\": \"string\"},"
 					+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
 				+ "]}");
-		if (SYSTEM_ENTITY_SCHEMA == null) {
-			SYSTEM_ENTITY_SCHEMA = parser.parse("{\"type\": \"record\", "
-					+ "\"name\": \"systemEntity\","
-					+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
-					+ "\"fields\": ["
-						+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
-						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
-					+ "]}");
-		}
-		if (ENTITY_FAMILY_SCHEMA == null) {
-			ENTITY_FAMILY_SCHEMA = parser.parse("{\"type\": \"record\", "
-    				+ "\"name\": \"entityFamily\", "
-    				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
-    				+ "\"fields\": ["
-    					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
-						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
-					+ "]}");
-		}
+		SYSTEM_ENTITY_SCHEMA = parser.parse("{\"type\": \"record\", "
+				+ "\"name\": \"systemEntity\","
+				+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
+				+ "\"fields\": ["
+					+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
+					+ "{\"name\": \"entityAttributes\", \"type\": \"generalSystemEntityAttributes\"}"
+				+ "]}");
+		ENTITY_FAMILY_SCHEMA = parser.parse("{\"type\": \"record\", "
+				+ "\"name\": \"entityFamily\", "
+				+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
+				+ "\"fields\": ["
+					+ "{\"name\": \"entityID\", \"type\": \"string\"},"
+					+ "{\"name\": \"entityAttributes\", \"type\": \"generalSystemEntityAttributes\"},"
+					+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
+				+ "]}");
 	}
 
 }
