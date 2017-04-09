@@ -32,35 +32,38 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private SourceDescriptor preferredSource;
 	private String stateChange;
 	private SchemaRegistryClient schemaRegistry;
+	private Map<UUID, GenericRecord> entities;
 
-	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry) {
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry, Map<UUID, GenericRecord> entities) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
 		initSons(sources);
 		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
+		this.entities = entities;
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
 		sons = new HashMap<>();
 		for (SourceDescriptor source : sources) {
-			sons.put(source, null);
+			sons.put(source, entities.get(source.getSystemUUID()));
+			entities.remove(source.getSystemUUID());
 		}
 	}
 
-	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-		this.uuid = uuid;
-		this.stateChange = StateChange;
-		initSons(sonsAttributes);
-		preferredSource = null;
-	}
-
-	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-		sons = new HashMap<>();
-		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
-			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
-		}
-	}
+//	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+//		this.uuid = uuid;
+//		this.stateChange = StateChange;
+//		initSons(sonsAttributes);
+//		preferredSource = null;
+//	}
+//
+//	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
+//		sons = new HashMap<>();
+//		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
+//			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
+//		}
+//	}
 
 	@Override
 	public ProducerRecord<String, Object> apply(ConsumerRecord<String, Object> record) {
@@ -70,6 +73,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			for (SourceDescriptor e: sons.keySet())
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
+			this.entities.put(uuid, data);
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
 			GenericRecord sonAttributes = convertGeneralAttributes(data);

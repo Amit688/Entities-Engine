@@ -38,12 +38,14 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private KafkaComponentsFactory componentsFactory;
     private Map<UUID, StreamDescriptor> streams;
     private SchemaRegistryClient schemaRegistry;
+    private Map<UUID, GenericRecord> entities;
     
     public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
         streams = new HashMap<>();
         this.schemaRegistry = schemaRegistry;
+        this.entities = new HashMap<>();
     }
 
     @Override
@@ -180,7 +182,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry);
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry, entities);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
@@ -192,19 +194,19 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
 	}
     
-    private void createStream(Source<ConsumerRecord<String, Object>, ?> source,
-			Map<SourceDescriptor, GenericRecord> sonsAttributes, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sonsAttributes);
-    	UniqueKillSwitch killSwitch = source
-    			.viaMat(KillSwitches.single(), Keep.right())
-    			.via(Flow.fromFunction(entityManager::apply))
-    			.to(componentsFactory.createSink())
-    			.run(materializer);
-
-    	System.out.println("storing stream descriptor for later use");
-    	streams.put(uuid,
-    			new StreamDescriptor(killSwitch, uuid, new ArrayList<>(sonsAttributes.keySet())));
-	}
+//    private void createStream(Source<ConsumerRecord<String, Object>, ?> source,
+//			Map<SourceDescriptor, GenericRecord> sonsAttributes, UUID uuid, String stateChange) {
+//    	EntityManager entityManager = new EntityManager(uuid, stateChange, sonsAttributes, schemaRegistry, entities);
+//    	UniqueKillSwitch killSwitch = source
+//    			.viaMat(KillSwitches.single(), Keep.right())
+//    			.via(Flow.fromFunction(entityManager::apply))
+//    			.to(componentsFactory.createSink())
+//    			.run(materializer);
+//
+//    	System.out.println("storing stream descriptor for later use");
+//    	streams.put(uuid,
+//    			new StreamDescriptor(killSwitch, uuid, new ArrayList<>(sonsAttributes.keySet())));
+//	}
 
     private void stopStream(StreamDescriptor stream) {
     	stream.getKillSwitch().shutdown();
