@@ -37,10 +37,10 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry, Map<UUID, GenericRecord> entities) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
-		initSons(sources);
 		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
 		this.entities = entities;
+		initSons(sources);
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
