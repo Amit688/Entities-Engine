@@ -19,7 +19,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
-	private static Schema BASIC_ATTRIBUTES__SCHEMA = null;
+	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
 	private static Schema GENERAL_ATTRIBUTES__SCHEMA = null;
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
 	private static Schema ENTITY_FAMILY_SCHEMA = null;
@@ -119,9 +119,9 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	private GenericRecord convertBasicAttributes(GenericRecord data) {
 		GenericRecord coordinateData = (GenericRecord) data.get("coordinate");
-		GenericRecordBuilder coordinateBuilder = new GenericRecordBuilder(BASIC_ATTRIBUTES__SCHEMA.getField("coordinate").schema());
+		GenericRecordBuilder coordinateBuilder = new GenericRecordBuilder(BASIC_ATTRIBUTES_SCHEMA.getField("coordinate").schema());
 		copyFields(coordinateData, coordinateBuilder, Arrays.asList("lat", "long"));
-		GenericRecordBuilder builder = new GenericRecordBuilder(BASIC_ATTRIBUTES__SCHEMA)
+		GenericRecordBuilder builder = new GenericRecordBuilder(BASIC_ATTRIBUTES_SCHEMA)
 				.set("coordinate", coordinateBuilder.build());
 		copyFields(data, builder, Arrays.asList("isNotTracked", "entityOffset", "sourceName"));
 		return builder.build();
@@ -163,7 +163,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	
 	private static void registerSchemas() {
 		Schema.Parser parser = new Schema.Parser();
-		parser.parse("{\"type\": \"record\","
+		BASIC_ATTRIBUTES_SCHEMA = parser.parse("{\"type\": \"record\","
 				+ "\"name\": \"basicSystemEntityAttributes\","
 				+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
 				+ "\"fields\": ["
