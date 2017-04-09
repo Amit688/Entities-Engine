@@ -183,7 +183,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				+ "\"name\": \"generalSystemEntityAttributes\","
 				+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
 				+ "\"fields\": ["
-					+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
+					+ "{\"name\": \"basicAttributes\",\"type\": \"basicSystemEntityAttributes\"},"
 					+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
 					+ "{\"name\": \"elevation\",\"type\": \"double\"},"
 					+ "{\"name\": \"course\",\"type\": \"double\"},"
