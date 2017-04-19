@@ -28,6 +28,14 @@ dependencies {
 	compile "io.confluent:kafka-schema-registry:3.2.0"
 	compile "io.confluent:common:3.2.0"
 	compile group: 'org.rocksdb', name: 'rocksdbjni', version: '5.0.1'
+
+	// Kamon
+	compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10'
+	compile group: 'io.kamon', name: 'kamon-system-metrics_2.11', version: '0.6.3'
+	compile group: 'io.kamon', name: 'kamon-akka-2.4_2.11', version: '0.6.6'
+	compile group: 'io.kamon', name: 'kamon-jmx_2.11', version: '0.6.6'
+	compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.21'
+
 	testCompile 'junit:junit:4.12'
 }
 
