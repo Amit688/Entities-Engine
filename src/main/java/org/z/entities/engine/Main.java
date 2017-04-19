@@ -11,6 +11,8 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import kamon.Kamon;
+
 import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
@@ -37,14 +39,34 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-		System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
-		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
-		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
+		Kamon.start();
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-//		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
-		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
+		String kafkaAddress = System.getenv("KAFKA_ADDRESS");
+		final String schemaRegistryURL = System.getenv("SCHEMA_REGISTRY_ADDRESS");
+		final String schemaRegistryIdentity = System.getenv("SCHEMA_REGISTRY_IDENTITY");
+		System.out.println("KAFKA::::::::" + kafkaAddress);
+		System.out.println("KAFKA::::::::" + schemaRegistryURL);
+		System.out.println("KAFKA::::::::" + schemaRegistryIdentity);
+		SchemaRegistryClient schemaRegistry;
+		if (schemaRegistryURL == null || schemaRegistryIdentity == null){
+			System.out.println("No proper ENV VARs - Using Mock Schema Registry");
+			schemaRegistry = new MockSchemaRegistryClient();
+		}else{
+			try{
+				int schemaRegistryIdentityAsInt = Integer.parseInt(schemaRegistryIdentity);
+				schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryURL, schemaRegistryIdentityAsInt);
+			}catch (Exception e){
+				System.out.println("No proper ENV VARs - Using Mock Schema Registry");
+				schemaRegistry = new MockSchemaRegistryClient();
+			}
+
+		}
+		if (kafkaAddress == null){
+			System.out.println("No proper ENV VARs - Using KAFKA_ADDRESS default");
+			kafkaAddress = "localhost:9092";
+		}
+		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, kafkaAddress);
 		
 //		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
@@ -52,6 +74,7 @@ public class Main {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
+				Kamon.shutdown();
 			}
 		});
 		System.out.println("Ready");
@@ -91,10 +114,10 @@ public class Main {
     }
     
     private static void writeSomeData(ActorSystem system, Materializer materializer, 
-    		SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
+    		String kafkaAddress, SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
 		ProducerSettings<String, Object> producerSettings = ProducerSettings
 				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
+				.withBootstrapServers(kafkaAddress);
 		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
 
 		Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");
