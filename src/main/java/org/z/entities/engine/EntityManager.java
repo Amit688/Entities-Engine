@@ -39,13 +39,11 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
 	private String stateChange;
-	private SchemaRegistryClient schemaRegistry;
 	private RocksDB stateStore;
 
-	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry,RocksDB stateStore) {
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, RocksDB stateStore) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
-		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
 		this.stateStore = stateStore;
 		initSons(sources);

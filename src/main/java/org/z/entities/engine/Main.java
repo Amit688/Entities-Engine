@@ -73,7 +73,7 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 		
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory, schemaRegistry);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
 		combinedSource
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);
