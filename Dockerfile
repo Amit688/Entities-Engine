@@ -1,5 +1,10 @@
 FROM gradle:jdk8-alpine
 
+RUN echo http://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
+RUN apk update
+RUN apk add --update \
+    libc6-compat
+
 RUN mkdir -p /home/gradle/src
 WORKDIR /home/gradle/src
 

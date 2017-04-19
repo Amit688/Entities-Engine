@@ -58,7 +58,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		Options options = new Options().setCreateIfMissing(true);
 		try {
 			// a factory method that returns a RocksDB instance
-			this.stateStore = RocksDB.open(options, "rocksDB/db");
+			this.stateStore = RocksDB.open(options, "rocks_db");
 		} catch (RocksDBException e) {
 			e.printStackTrace();
 		}
