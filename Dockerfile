@@ -1,5 +1,6 @@
 FROM gradle:jdk8-alpine
 
+USER root
 RUN apk update
 RUN apk add --update libc6-compat
 
