@@ -1,5 +1,8 @@
 package org.z.entities.engine;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,8 +18,13 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.EnumSymbol;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
+import org.apache.avro.io.*;
+import org.apache.avro.specific.SpecificDatumReader;
+import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
 	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
@@ -32,38 +40,33 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private SourceDescriptor preferredSource;
 	private String stateChange;
 	private SchemaRegistryClient schemaRegistry;
-	private Map<UUID, GenericRecord> entities;
+	private RocksDB stateStore;
 
-	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry, Map<UUID, GenericRecord> entities) {
+	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, SchemaRegistryClient schemaRegistry,RocksDB stateStore) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
 		this.schemaRegistry = schemaRegistry;
 		preferredSource = null;
-		this.entities = entities;
+		this.stateStore = stateStore;
 		initSons(sources);
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
 		sons = new HashMap<>();
 		for (SourceDescriptor source : sources) {
-			sons.put(source, entities.get(source.getSystemUUID()));
-			entities.remove(source.getSystemUUID());
+			try {
+				sons.put(source, AvroGenericRecordUtils.decode(stateStore.get(source.getSystemUUID().toString().getBytes()), ENTITY_FAMILY_SCHEMA));
+				stateStore.delete(source.getSystemUUID().toString().getBytes());
+			} catch (RocksDBException e) {
+				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("EntityManager: Failed to initialize sons due to IOException, stacktrace below:");
+				e.printStackTrace();
+			}
+
 		}
 	}
-
-//	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-//		this.uuid = uuid;
-//		this.stateChange = StateChange;
-//		initSons(sonsAttributes);
-//		preferredSource = null;
-//	}
-//
-//	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-//		sons = new HashMap<>();
-//		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
-//			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
-//		}
-//	}
 
 	@Override
 	public ProducerRecord<String, Object> apply(ConsumerRecord<String, Object> record) {
@@ -73,7 +76,14 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			for (SourceDescriptor e: sons.keySet())
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
-			this.entities.put(uuid, data);
+			try {
+				this.stateStore.put(uuid.toString().getBytes(), AvroGenericRecordUtils.encode(data));
+			} catch (RocksDBException e) {
+				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
 			GenericRecord sonAttributes = convertGeneralAttributes(data);

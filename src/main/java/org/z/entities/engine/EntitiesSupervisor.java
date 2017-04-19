@@ -13,6 +13,9 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 import akka.NotUsed;
 import akka.kafka.javadsl.Consumer;
@@ -30,6 +33,7 @@ import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Source;
 
 
+
 /**
  * Created by Amit on 20/03/2017.
  */
@@ -38,16 +42,29 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private KafkaComponentsFactory componentsFactory;
     private Map<UUID, StreamDescriptor> streams;
     private SchemaRegistryClient schemaRegistry;
-    private Map<UUID, GenericRecord> entities;
+    private RocksDB stateStore;
     
     public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
         streams = new HashMap<>();
         this.schemaRegistry = schemaRegistry;
-        this.entities = new HashMap<>();
+		this.stateStore = null;
+		initRocksDb();
     }
 
+	private void initRocksDb(){
+		RocksDB.loadLibrary();
+		// the Options class contains a set of configurable DB options
+		// that determines the behavior of a database.
+		Options options = new Options().setCreateIfMissing(true);
+		try {
+			// a factory method that returns a RocksDB instance
+			this.stateStore = RocksDB.open(options, "rocksDB/db");
+		} catch (RocksDBException e) {
+			e.printStackTrace();
+		}
+	}
     @Override
     public void accept(EntitiesEvent event) {
     	try {
@@ -182,7 +199,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry, entities);
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry, stateStore);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))

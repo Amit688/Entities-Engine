@@ -27,6 +27,7 @@ dependencies {
 	compile "io.confluent:kafka-avro-serializer:3.2.0"
 	compile "io.confluent:kafka-schema-registry:3.2.0"
 	compile "io.confluent:common:3.2.0"
+	compile group: 'org.rocksdb', name: 'rocksdbjni', version: '5.0.1'
 	testCompile 'junit:junit:4.12'
 }
 
