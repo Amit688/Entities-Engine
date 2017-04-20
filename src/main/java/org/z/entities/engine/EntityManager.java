@@ -1,8 +1,5 @@
 package org.z.entities.engine;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,15 +9,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.EnumSymbol;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
-import org.apache.avro.io.*;
-import org.apache.avro.specific.SpecificDatumReader;
-import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.rocksdb.RocksDB;
@@ -46,15 +39,21 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		this.stateChange = StateChange;
 		preferredSource = null;
 		this.stateStore = stateStore;
-		initSons(sources);
+		if (this.stateChange.equals("MERGED"))
+			initSons(sources);
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
 		sons = new HashMap<>();
 		for (SourceDescriptor source : sources) {
 			try {
-				sons.put(source, AvroGenericRecordUtils.decode(stateStore.get(source.getSystemUUID().toString().getBytes()), ENTITY_FAMILY_SCHEMA));
-				stateStore.delete(source.getSystemUUID().toString().getBytes());
+				byte[] sonState = stateStore.get(source.getSystemUUID().toString().getBytes());
+				if (sonState != null) {
+					sons.put(source, AvroGenericRecordUtils.decode(sonState, ENTITY_FAMILY_SCHEMA));
+					stateStore.delete(source.getSystemUUID().toString().getBytes());
+				} else {
+					System.out.println("searched for son: " + source.getSystemUUID() + " in state store and couldn't find it!");
+				}
 			} catch (RocksDBException e) {
 				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
 				e.printStackTrace();
