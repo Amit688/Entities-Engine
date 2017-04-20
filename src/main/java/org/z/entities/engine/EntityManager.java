@@ -39,12 +39,12 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		this.stateChange = StateChange;
 		preferredSource = null;
 		this.stateStore = stateStore;
+		this.sons = new HashMap<>();
 		if (this.stateChange.equals("MERGED"))
 			initSons(sources);
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
-		sons = new HashMap<>();
 		for (SourceDescriptor source : sources) {
 			try {
 				byte[] sonState = stateStore.get(source.getSystemUUID().toString().getBytes());
