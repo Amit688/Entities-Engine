@@ -1,9 +1,6 @@
-FROM gradle:jdk8-alpine
+FROM gradle:3.5-jdk8
 
 USER root
-RUN apk update
-RUN apk add --update libc6-compat
-
 RUN mkdir -p /home/gradle/src
 WORKDIR /home/gradle/src
 
