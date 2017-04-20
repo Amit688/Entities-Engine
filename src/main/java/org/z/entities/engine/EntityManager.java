@@ -40,20 +40,20 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		preferredSource = null;
 		this.stateStore = stateStore;
 		this.sons = new HashMap<>();
-		if (this.stateChange.equals("MERGED"))
-			initSons(sources);
+        initSons(sources);
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
 		for (SourceDescriptor source : sources) {
 			try {
-				byte[] sonState = stateStore.get(source.getSystemUUID().toString().getBytes());
-				if (sonState != null) {
-					sons.put(source, AvroGenericRecordUtils.decode(sonState, ENTITY_FAMILY_SCHEMA));
-					stateStore.delete(source.getSystemUUID().toString().getBytes());
-				} else {
-					System.out.println("searched for son: " + source.getSystemUUID() + " in state store and couldn't find it!");
-				}
+                byte[] sonState = stateStore.get(source.getSystemUUID().toString().getBytes());
+                if (sonState != null) {
+                    sons.put(source, AvroGenericRecordUtils.decode(sonState, ENTITY_FAMILY_SCHEMA));
+                    stateStore.delete(source.getSystemUUID().toString().getBytes());
+                } else {
+                    System.out.println("searched for son: " + source.getSystemUUID() + " in state store and couldn't find it!, adding it now....");
+                    sons.put(source, null);
+                }
 			} catch (RocksDBException e) {
 				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
 				e.printStackTrace();
