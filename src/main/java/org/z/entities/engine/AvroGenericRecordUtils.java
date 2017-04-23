@@ -18,11 +18,11 @@ import java.io.IOException;
  */
 class AvroGenericRecordUtils {
 
-    static byte[] encode(GenericRecord record) throws IOException {
+    static byte[] encode(GenericRecord record, Schema schema) throws IOException {
 
         GenericDatumWriter<GenericRecord>
                 datumWriter =
-                new GenericDatumWriter<>(record.getSchema());
+                new GenericDatumWriter<>(schema);
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         byteArrayOutputStream.reset();
         BinaryEncoder binaryEncoder = new EncoderFactory().binaryEncoder(byteArrayOutputStream, null);

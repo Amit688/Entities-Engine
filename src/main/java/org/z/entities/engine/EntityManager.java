@@ -74,7 +74,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
 			try {
-				this.stateStore.put(uuid.toString().getBytes(), AvroGenericRecordUtils.encode(data));
+				this.stateStore.put(uuid.toString().getBytes(), AvroGenericRecordUtils.encode(data, ENTITY_FAMILY_SCHEMA));
 			} catch (RocksDBException e) {
 				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
 				e.printStackTrace();
