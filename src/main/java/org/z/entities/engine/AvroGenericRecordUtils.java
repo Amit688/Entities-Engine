@@ -1,6 +1,8 @@
 package org.z.entities.engine;
 
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.*;
 import org.apache.avro.specific.SpecificDatumReader;
@@ -17,9 +19,10 @@ import java.io.IOException;
 class AvroGenericRecordUtils {
 
     static byte[] encode(GenericRecord record) throws IOException {
-        SpecificDatumWriter<GenericRecord>
+
+        GenericDatumWriter<GenericRecord>
                 datumWriter =
-                new SpecificDatumWriter<>(record.getSchema());
+                new GenericDatumWriter<>(record.getSchema());
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         byteArrayOutputStream.reset();
         BinaryEncoder binaryEncoder = new EncoderFactory().binaryEncoder(byteArrayOutputStream, null);
@@ -31,11 +34,11 @@ class AvroGenericRecordUtils {
 
 
     static GenericRecord decode(byte[] recordBytes, Schema schema) throws IOException {
-        DatumReader<GenericRecord>
+        GenericDatumReader<GenericRecord>
                 datumReader =
-                new SpecificDatumReader<>(schema);
+                new GenericDatumReader<>(schema);
         ByteArrayInputStream stream = new ByteArrayInputStream(recordBytes);
-        stream.reset();
+//        stream.reset();
         BinaryDecoder binaryDecoder = new DecoderFactory().binaryDecoder(stream, null);
         GenericRecord record = null;
         while (true) {
