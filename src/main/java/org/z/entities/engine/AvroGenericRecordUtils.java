@@ -5,12 +5,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.*;
-import org.apache.avro.specific.SpecificDatumReader;
-import org.apache.avro.specific.SpecificDatumWriter;
-
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 
 /**
@@ -18,36 +13,28 @@ import java.io.IOException;
  */
 class AvroGenericRecordUtils {
 
-    static byte[] encode(GenericRecord record, Schema schema) throws IOException {
+    private final DatumReader<GenericRecord> datumReader;
+    private final DatumWriter<GenericRecord> datumWriter;
 
-        GenericDatumWriter<GenericRecord>
-                datumWriter =
-                new GenericDatumWriter<>(schema);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        byteArrayOutputStream.reset();
-        BinaryEncoder binaryEncoder = new EncoderFactory().binaryEncoder(byteArrayOutputStream, null);
-        datumWriter.write(record, binaryEncoder);
-        binaryEncoder.flush();
-        byte[] bytes = byteArrayOutputStream.toByteArray();
-        return bytes;
+    public AvroGenericRecordUtils(Schema schema) {
+        datumReader = new GenericDatumReader<GenericRecord>(schema);
+        datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     }
 
+    public byte[] serialize(GenericRecord record) throws IOException {
+        BinaryEncoder encoder = null;
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        encoder = EncoderFactory.get().binaryEncoder(stream, encoder);
 
-    static GenericRecord decode(byte[] recordBytes, Schema schema) throws IOException {
-        GenericDatumReader<GenericRecord>
-                datumReader =
-                new GenericDatumReader<>(schema);
-        ByteArrayInputStream stream = new ByteArrayInputStream(recordBytes);
-//        stream.reset();
-        BinaryDecoder binaryDecoder = new DecoderFactory().binaryDecoder(stream, null);
-        GenericRecord record = null;
-        while (true) {
-            try {
-                record = datumReader.read(null, binaryDecoder);
-            } catch (EOFException e) {
-                break;
-            }
-        }
+        datumWriter.write(record, encoder);
+        encoder.flush();
+
+        return stream.toByteArray();
+    }
+
+    public GenericRecord deserialize(byte[] bytes) throws IOException {
+        BinaryDecoder decoder = DecoderFactory.get().binaryDecoder(bytes, null);
+        GenericRecord record = datumReader.read(null, decoder);
         return record;
     }
 }

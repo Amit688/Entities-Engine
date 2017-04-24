@@ -33,6 +33,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 	private SourceDescriptor preferredSource;
 	private String stateChange;
 	private RocksDB stateStore;
+	private AvroGenericRecordUtils avroUtils;
 
 	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, RocksDB stateStore) {
 		this.uuid = uuid;
@@ -40,6 +41,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 		preferredSource = null;
 		this.stateStore = stateStore;
 		this.sons = new HashMap<>();
+		this.avroUtils = new AvroGenericRecordUtils(ENTITY_FAMILY_SCHEMA);
         initSons(sources);
 	}
 
@@ -48,7 +50,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			try {
                 byte[] sonState = stateStore.get(source.getSystemUUID().toString().getBytes());
                 if (sonState != null) {
-                    sons.put(source, AvroGenericRecordUtils.decode(sonState, ENTITY_FAMILY_SCHEMA));
+                    sons.put(source, avroUtils.deserialize(sonState));
                     stateStore.delete(source.getSystemUUID().toString().getBytes());
                 } else {
                     System.out.println("searched for son: " + source.getSystemUUID() + " in state store and couldn't find it!, adding it now....");
@@ -74,7 +76,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
 			GenericRecord data = (GenericRecord) record.value();
 			try {
-				this.stateStore.put(uuid.toString().getBytes(), AvroGenericRecordUtils.encode(data, ENTITY_FAMILY_SCHEMA));
+				this.stateStore.put(uuid.toString().getBytes(), avroUtils.serialize(data));
 			} catch (RocksDBException e) {
 				System.out.println("EntityManager: Failed to initialize sons due to RocksDBException, stacktrace below:");
 				e.printStackTrace();
