@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -42,7 +42,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
-        streams = new HashMap<>();
+        streams = new ConcurrentHashMap<>();
         this.entities = new HashMap<>();
     }
 

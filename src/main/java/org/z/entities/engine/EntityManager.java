@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.EnumSymbol;
