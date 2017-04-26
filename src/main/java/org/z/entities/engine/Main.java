@@ -47,7 +47,7 @@ public class Main {
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
 		
 //		registerSchemas(schemaRegistry);
-		createSupervisorStream(materializer, sourceFactory, schemaRegistry);
+		createSupervisorStream(materializer, sourceFactory);
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -60,8 +60,7 @@ public class Main {
 		}
     }
     
-    private static void createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory,
-    		SchemaRegistryClient schemaRegistry) {
+    private static void createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory) {
     	Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(sourceFactory, "creation", EntitiesEvent.Type.CREATE);
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
 		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
@@ -73,7 +72,7 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 		
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory, schemaRegistry);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
 		combinedSource
     		.to(Sink.foreach(supervisor::accept))
     		.run(materializer);

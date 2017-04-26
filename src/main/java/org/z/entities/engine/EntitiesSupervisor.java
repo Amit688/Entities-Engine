@@ -37,14 +37,12 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private Materializer materializer;
     private KafkaComponentsFactory componentsFactory;
     private Map<UUID, StreamDescriptor> streams;
-    private SchemaRegistryClient schemaRegistry;
     private Map<UUID, GenericRecord> entities;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, SchemaRegistryClient schemaRegistry) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
         streams = new HashMap<>();
-        this.schemaRegistry = schemaRegistry;
         this.entities = new HashMap<>();
     }
 
@@ -182,7 +180,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     
     private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, schemaRegistry, entities);
+    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, entities);
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
