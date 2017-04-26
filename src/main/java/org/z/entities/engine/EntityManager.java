@@ -17,7 +17,7 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<String, Object>> {
+public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<Object, Object>> {
 	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
 	private static Schema GENERAL_ATTRIBUTES__SCHEMA = null;
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
@@ -63,7 +63,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 //	}
 
 	@Override
-	public ProducerRecord<String, Object> apply(ConsumerRecord<String, Object> record) {
+	public ProducerRecord<Object, Object> apply(ConsumerRecord<String, Object> record) {
 		try {
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
@@ -78,7 +78,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 			try {
 				GenericRecord guiUpdate = createUpdate();
 				System.out.print("GUI UPDATE:\n" + guiUpdate);
-				return new ProducerRecord<String, Object>("update", guiUpdate);
+				return new ProducerRecord<>("update", uuid.toString(), guiUpdate);
 			} catch (IOException e) {
 				System.out.println("failed to generate update");
 				e.printStackTrace();
