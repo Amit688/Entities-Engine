@@ -44,7 +44,9 @@ public class Main {
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 //		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
-		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry, System.getenv("KAFKA_ADDRESS"));
+		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
+				System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
+				Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
 		
 //		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory);
@@ -80,7 +82,7 @@ public class Main {
     
     private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
     		String topic, EntitiesEvent.Type type) {
-    	return sourceFactory.createSource(topic)
+    	return sourceFactory.getSource(topic)
     			.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
     }
     
