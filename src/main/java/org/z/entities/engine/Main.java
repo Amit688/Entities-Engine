@@ -37,9 +37,11 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 public class Main {
 	
     public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-		System.out.println("KAFKA::::::::" + System.getenv("KAFKA_ADDRESS"));
-		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
-		System.out.println("KAFKA::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
+		System.out.println("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
+		System.out.println("SCHEMA_REGISTRY_ADDRESS::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
+		System.out.println("SCHEMA_REGISTRY_IDENTITY::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
+		System.out.println("SINGLE_SOURCE_PER_TOPIC::::::::" + System.getenv("SINGLE_SOURCE_PER_TOPIC"));
+		System.out.println("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 //		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();

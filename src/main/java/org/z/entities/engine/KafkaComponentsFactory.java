@@ -42,7 +42,9 @@ public class KafkaComponentsFactory {
 		this.singleSourcePerTopic = singleSourceTopic;
 		this.singleSink = singleSink;
 		this.topicSource = new HashMap<>();
-		this.sink = getSink();
+		if (this.singleSink) {
+			this.sink = createNewSink();
+		}
 	}
 	
 	/**
@@ -56,9 +58,13 @@ public class KafkaComponentsFactory {
 		if (singleSourcePerTopic) {
 			if (!topicSource.containsKey(topic)){
 				topicSource.put(topic, createNewSource(topic));
+				System.out.println("Creating new source for topic " + topic);
+			} else {
+				System.out.println("Sharing source for topic " + topic);
 			}
 			return topicSource.get(topic);
 		} else {
+			System.out.println("NOT SHARING SOURCES MODE !!!!! ");
 			return createNewSource(topic);
 		}
 	}
@@ -124,8 +130,10 @@ public class KafkaComponentsFactory {
 
 	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> getSink() {
 		if (singleSink){
+			System.out.println("Sharing Sink!");
 			return sink;
 		} else {
+			System.out.println("Creating new Sink");
 			return createNewSink();
 		}
 	}
