@@ -10,7 +10,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 
 import akka.Done;
 import akka.actor.ActorSystem;
@@ -138,9 +137,9 @@ public class KafkaComponentsFactory {
 		}
 	}
 
-	private Sink<ProducerRecord<String, Object>, CompletionStage<Done>> createNewSink() {
-		ProducerSettings<String, Object> producerSettings = ProducerSettings
-				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
+	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> createSink() {
+		ProducerSettings<Object, Object> producerSettings = ProducerSettings
+				.create(system, new KafkaAvroSerializer(schemaRegistry), new KafkaAvroSerializer(schemaRegistry))
 				.withBootstrapServers(kafkaUrl);
 		return Producer.plainSink(producerSettings);
 	}
