@@ -1,5 +1,7 @@
 package org.z.entities.engine;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 import org.apache.avro.generic.GenericRecord;
@@ -26,11 +28,22 @@ public class KafkaComponentsFactory {
 	private ActorSystem system;
 	private SchemaRegistryClient schemaRegistry;
 	private String kafkaUrl;
+	private boolean singleSourcePerTopic;
+	private final boolean singleSink;
+	private Map<String, Source<ConsumerRecord<String, Object>, Consumer.Control>> topicSource;
+	private Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink;
 	
-	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl) {
+	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
+								  boolean singleSourceTopic, boolean singleSink) {
 		this.system = system;
 		this.schemaRegistry = schemaRegistry;
 		this.kafkaUrl = kafkaUrl;
+		this.singleSourcePerTopic = singleSourceTopic;
+		this.singleSink = singleSink;
+		this.topicSource = new HashMap<>();
+		if (this.singleSink) {
+			this.sink = createNewSink();
+		}
 	}
 	
 	/**
@@ -40,60 +53,88 @@ public class KafkaComponentsFactory {
 	 * @param topic
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic) {
-		ConsumerSettings<String, Object> consumerSettings = 
-    			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
-    			.withBootstrapServers(kafkaUrl)
-    			.withGroupId("group1")
-    			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        return Consumer.plainSource(consumerSettings, 
-        		Subscriptions.assignment(new TopicPartition(topic, 0)));
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic) {
+		if (singleSourcePerTopic) {
+			if (!topicSource.containsKey(topic)){
+				topicSource.put(topic, createNewSource(topic));
+				System.out.println("Creating new source for topic " + topic);
+			} else {
+				System.out.println("Sharing source for topic " + topic);
+			}
+			return topicSource.get(topic);
+		} else {
+			System.out.println("NOT SHARING SOURCES MODE !!!!! ");
+			return createNewSource(topic);
+		}
 	}
-	
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, long offset) {
-		ConsumerSettings<String, Object> consumerSettings =
-    			ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
-    			.withBootstrapServers(kafkaUrl)
-    			.withGroupId("group1")
-    			.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        return Consumer.plainSource(consumerSettings,
-        		Subscriptions.assignmentWithOffset(new TopicPartition(topic, 0), offset));
+
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic, long offset) {
+		if (singleSourcePerTopic) {
+			if (!topicSource.containsKey(topic)){
+				topicSource.put(topic, createNewSource(topic, offset));
+			}
+			return topicSource.get(topic);
+		} else {
+			return createNewSource(topic, offset);
+		}
 	}
 
 	/**
 	 * Creates a source that filters its messages by a reportId
-	 * 
+	 *
 	 * @param system
 	 * @param topic
 	 * @param reportsId
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, String reportsId) {
-		return createSource(topic).filter(record -> filterByReportsId(record, reportsId));
-	}
-	
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(String topic, String reportsId, long offset) {
-		return createSource(topic, offset).filter(record -> filterByReportsId(record, reportsId));
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic, String reportsId) {
+		return getSource(topic).filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	private boolean filterByReportsId(ConsumerRecord<String, Object> incomingUpdate, String reportsId) {
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
 	}
-	
+
 	/**
 	 * Creates a source from a source descriptor
-	 * 
+	 *
 	 * @param system
 	 * @param descriptor
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor) {
-		return createSource(descriptor.getSensorId(), descriptor.getReportsId());
+	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(SourceDescriptor descriptor) {
+		return getSource(descriptor.getSensorId(), descriptor.getReportsId());
 	}
-	
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> createSource(SourceDescriptor descriptor, long offset) {
-		return createSource(descriptor.getSensorId(), descriptor.getReportsId(), offset);
+
+	private Source<ConsumerRecord<String, Object>, Consumer.Control> createNewSource(String topic) {
+		return Consumer.plainSource(createConsumerSettings(),
+				Subscriptions.assignment(getTopicPartition(topic)));
+	}
+	private Source<ConsumerRecord<String, Object>, Consumer.Control> createNewSource(String topic, long offset) {
+		return Consumer.plainSource(createConsumerSettings(),
+				Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
+	}
+
+	private ConsumerSettings<String, Object> createConsumerSettings() {
+		return ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
+        .withBootstrapServers(kafkaUrl)
+        .withGroupId("group1")
+        .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+	}
+
+	private TopicPartition getTopicPartition(String topic) {
+		return new TopicPartition(topic, 0);
+	}
+
+	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> getSink() {
+		if (singleSink){
+			System.out.println("Sharing Sink!");
+			return sink;
+		} else {
+			System.out.println("Creating new Sink");
+			return createNewSink();
+		}
 	}
 
 	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> createSink() {

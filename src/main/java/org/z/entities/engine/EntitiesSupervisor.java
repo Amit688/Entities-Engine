@@ -145,7 +145,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		
 		for (SourceDescriptor entry : sonsSources) {
 //			Long offset = (Long) ((GenericRecord) entry.getValue().get("basicAttributes")).get("entityOffset");
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.createSource(entry);
+			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.getSource(entry);
 			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
@@ -174,7 +174,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     }
     
     private void createStream(SourceDescriptor sourceDescriptor, UUID uuid, String stateChange) {
-    	createStream(componentsFactory.createSource(sourceDescriptor), Arrays.asList(sourceDescriptor), uuid,
+    	createStream(componentsFactory.getSource(sourceDescriptor), Arrays.asList(sourceDescriptor), uuid,
 				stateChange);
     }
     
@@ -184,7 +184,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     	UniqueKillSwitch killSwitch = source
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
-    			.to(componentsFactory.createSink())
+    			.to(componentsFactory.getSink())
     			.run(materializer);
     	
     	System.out.println("storing stream descriptor for later use");
@@ -198,7 +198,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 //    	UniqueKillSwitch killSwitch = source
 //    			.viaMat(KillSwitches.single(), Keep.right())
 //    			.via(Flow.fromFunction(entityManager::apply))
-//    			.to(componentsFactory.createSink())
+//    			.to(componentsFactory.getSink())
 //    			.run(materializer);
 //
 //    	System.out.println("storing stream descriptor for later use");
