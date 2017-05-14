@@ -11,3 +11,6 @@ testing.iml
 testing.ipr
 
 testing.iws
+
+/testing/
+/native/

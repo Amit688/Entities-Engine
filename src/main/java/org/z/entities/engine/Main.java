@@ -31,6 +31,8 @@ import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
+
+import kamon.Kamon;
 /**
  * Created by Amit on 20/03/2017.
  */
@@ -42,6 +44,9 @@ public class Main {
 		System.out.println("SCHEMA_REGISTRY_IDENTITY::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
 		System.out.println("SINGLE_SOURCE_PER_TOPIC::::::::" + System.getenv("SINGLE_SOURCE_PER_TOPIC"));
 		System.out.println("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
+		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
+
+		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
     	final ActorSystem system = ActorSystem.create();
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 //		final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
@@ -49,13 +54,19 @@ public class Main {
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
 				System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
 				Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
-		
+
+		if (isKamonEnabled) {
+			Kamon.start();
+		}
 //		registerSchemas(schemaRegistry);
 		createSupervisorStream(materializer, sourceFactory);
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				system.terminate();
+				if (isKamonEnabled) {
+					Kamon.shutdown();
+				}
 			}
 		});
 		System.out.println("Ready");
