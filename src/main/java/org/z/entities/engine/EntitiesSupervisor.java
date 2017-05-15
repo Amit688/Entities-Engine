@@ -88,7 +88,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		uuidsToMerge.forEach(System.out::println);
     	if (streams.keySet().containsAll(uuidsToMerge)) {
     		List<SourceDescriptor> sonsSources = killAndFlattenSonsAttributes(uuidsToMerge);
-    		Source<ConsumerRecord<String, Object>, NotUsed> mergedSource =
+    		Source<ConsumerRecord<Object, Object>, NotUsed> mergedSource =
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sonsSources)));
     		createStream(mergedSource, sonsSources, UUID.randomUUID(), "MERGED");
     	} else {
@@ -138,15 +138,15 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		return new SourceDescriptor(sourceName, externalSystemID, uuid);
 	}
 	
-	private SourceShape<ConsumerRecord<String, Object>> createMergedSourceGraph(
+	private SourceShape<ConsumerRecord<Object, Object>> createMergedSourceGraph(
 			Builder<NotUsed> builder,List<SourceDescriptor> sonsSources) {
-		UniformFanInShape<ConsumerRecord<String, Object>, ConsumerRecord<String, Object>> merger = 
+		UniformFanInShape<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>> merger =
 				builder.add(Merge.create(sonsSources.size()));
 		
 		for (SourceDescriptor entry : sonsSources) {
 //			Long offset = (Long) ((GenericRecord) entry.getValue().get("basicAttributes")).get("entityOffset");
-			Source<ConsumerRecord<String, Object>, Consumer.Control> source = componentsFactory.getSource(entry);
-			Outlet<ConsumerRecord<String, Object>> outlet = builder.add(source).out();
+			Source<ConsumerRecord<Object, Object>, Consumer.Control> source = componentsFactory.getSource(entry);
+			Outlet<ConsumerRecord<Object, Object>> outlet = builder.add(source).out();
 			builder.from(outlet).toFanIn(merger);
 		}
 		return SourceShape.of(merger.out());
@@ -178,7 +178,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				stateChange);
     }
     
-    private void createStream(Source<ConsumerRecord<String, Object>, ?> source, 
+    private void createStream(Source<ConsumerRecord<Object, Object>, ?> source,
 			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
     	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, entities);
     	UniqueKillSwitch killSwitch = source

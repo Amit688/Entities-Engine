@@ -17,7 +17,7 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-public class EntityManager implements Function<ConsumerRecord<String, Object>, ProducerRecord<Object, Object>> {
+public class EntityManager implements Function<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>> {
 	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
 	private static Schema GENERAL_ATTRIBUTES__SCHEMA = null;
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
@@ -63,7 +63,7 @@ public class EntityManager implements Function<ConsumerRecord<String, Object>, P
 //	}
 
 	@Override
-	public ProducerRecord<Object, Object> apply(ConsumerRecord<String, Object> record) {
+	public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {
 		try {
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");

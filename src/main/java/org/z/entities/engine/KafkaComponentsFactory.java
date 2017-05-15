@@ -30,8 +30,8 @@ public class KafkaComponentsFactory {
 	private String kafkaUrl;
 	private boolean singleSourcePerTopic;
 	private final boolean singleSink;
-	private Map<String, Source<ConsumerRecord<String, Object>, Consumer.Control>> topicSource;
-	private Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink;
+	private Map<String, Source<ConsumerRecord<Object, Object>, Consumer.Control>> topicSource;
+	private Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> sink;
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean singleSourceTopic, boolean singleSink) {
@@ -53,7 +53,7 @@ public class KafkaComponentsFactory {
 	 * @param topic
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
 		if (singleSourcePerTopic) {
 			if (!topicSource.containsKey(topic)){
 				topicSource.put(topic, createNewSource(topic));
@@ -68,7 +68,7 @@ public class KafkaComponentsFactory {
 		}
 	}
 
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic, long offset) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, long offset) {
 		if (singleSourcePerTopic) {
 			if (!topicSource.containsKey(topic)){
 				topicSource.put(topic, createNewSource(topic, offset));
@@ -87,11 +87,11 @@ public class KafkaComponentsFactory {
 	 * @param reportsId
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(String topic, String reportsId) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId) {
 		return getSource(topic).filter(record -> filterByReportsId(record, reportsId));
 	}
 
-	private boolean filterByReportsId(ConsumerRecord<String, Object> incomingUpdate, String reportsId) {
+	private boolean filterByReportsId(ConsumerRecord<Object, Object> incomingUpdate, String reportsId) {
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
 	}
@@ -103,21 +103,21 @@ public class KafkaComponentsFactory {
 	 * @param descriptor
 	 * @return
 	 */
-	public Source<ConsumerRecord<String, Object>, Consumer.Control> getSource(SourceDescriptor descriptor) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(SourceDescriptor descriptor) {
 		return getSource(descriptor.getSensorId(), descriptor.getReportsId());
 	}
 
-	private Source<ConsumerRecord<String, Object>, Consumer.Control> createNewSource(String topic) {
+	private Source<ConsumerRecord<Object, Object>, Consumer.Control> createNewSource(String topic) {
 		return Consumer.plainSource(createConsumerSettings(),
 				Subscriptions.assignment(getTopicPartition(topic)));
 	}
-	private Source<ConsumerRecord<String, Object>, Consumer.Control> createNewSource(String topic, long offset) {
+	private Source<ConsumerRecord<Object, Object>, Consumer.Control> createNewSource(String topic, long offset) {
 		return Consumer.plainSource(createConsumerSettings(),
 				Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
 	}
 
-	private ConsumerSettings<String, Object> createConsumerSettings() {
-		return ConsumerSettings.create(system, new StringDeserializer(), new KafkaAvroDeserializer(schemaRegistry))
+	private ConsumerSettings<Object, Object> createConsumerSettings() {
+		return ConsumerSettings.create(system, new KafkaAvroDeserializer(schemaRegistry), new KafkaAvroDeserializer(schemaRegistry))
         .withBootstrapServers(kafkaUrl)
         .withGroupId("group1")
         .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -127,7 +127,7 @@ public class KafkaComponentsFactory {
 		return new TopicPartition(topic, 0);
 	}
 
-	public Sink<ProducerRecord<String, Object>, CompletionStage<Done>> getSink() {
+	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> getSink() {
 		if (singleSink){
 			System.out.println("Sharing Sink!");
 			return sink;
@@ -137,7 +137,7 @@ public class KafkaComponentsFactory {
 		}
 	}
 
-	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> createSink() {
+	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> createNewSink() {
 		ProducerSettings<Object, Object> producerSettings = ProducerSettings
 				.create(system, new KafkaAvroSerializer(schemaRegistry), new KafkaAvroSerializer(schemaRegistry))
 				.withBootstrapServers(kafkaUrl);
