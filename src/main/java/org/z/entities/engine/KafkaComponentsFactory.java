@@ -4,18 +4,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
+import akka.actor.ActorRef;
+import akka.kafka.*;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.StringDeserializer;
 
 import akka.Done;
 import akka.actor.ActorSystem;
-import akka.kafka.ConsumerSettings;
-import akka.kafka.ProducerSettings;
-import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
 import akka.kafka.javadsl.Producer;
 import akka.stream.javadsl.Sink;
@@ -28,54 +26,25 @@ public class KafkaComponentsFactory {
 	private ActorSystem system;
 	private SchemaRegistryClient schemaRegistry;
 	private String kafkaUrl;
-	private boolean singleSourcePerTopic;
-	private final boolean singleSink;
+	private final boolean sharingSources;
+	private final boolean sharingSinks;
 	private Map<String, Source<ConsumerRecord<Object, Object>, Consumer.Control>> topicSource;
 	private Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> sink;
+	private ActorRef consumerActor;
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
-								  boolean singleSourceTopic, boolean singleSink) {
+								  boolean sharingSources, boolean sharingSinks) {
 		this.system = system;
 		this.schemaRegistry = schemaRegistry;
 		this.kafkaUrl = kafkaUrl;
-		this.singleSourcePerTopic = singleSourceTopic;
-		this.singleSink = singleSink;
+		this.sharingSources = sharingSources;
+		this.sharingSinks = sharingSinks;
 		this.topicSource = new HashMap<>();
-		if (this.singleSink) {
+		if (this.sharingSources) {
+			this.consumerActor = system.actorOf((KafkaConsumerActor.props(createConsumerSettings())));
+		}
+		if (this.sharingSinks) {
 			this.sink = createNewSink();
-		}
-	}
-	
-	/**
-	 * Creates a source that listens on a topic.
-	 * 
-	 * @param system
-	 * @param topic
-	 * @return
-	 */
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
-		if (singleSourcePerTopic) {
-			if (!topicSource.containsKey(topic)){
-				topicSource.put(topic, createNewSource(topic));
-				System.out.println("Creating new source for topic " + topic);
-			} else {
-				System.out.println("Sharing source for topic " + topic);
-			}
-			return topicSource.get(topic);
-		} else {
-			System.out.println("NOT SHARING SOURCES MODE !!!!! ");
-			return createNewSource(topic);
-		}
-	}
-
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, long offset) {
-		if (singleSourcePerTopic) {
-			if (!topicSource.containsKey(topic)){
-				topicSource.put(topic, createNewSource(topic, offset));
-			}
-			return topicSource.get(topic);
-		} else {
-			return createNewSource(topic, offset);
 		}
 	}
 
@@ -107,20 +76,31 @@ public class KafkaComponentsFactory {
 		return getSource(descriptor.getSensorId(), descriptor.getReportsId());
 	}
 
-	private Source<ConsumerRecord<Object, Object>, Consumer.Control> createNewSource(String topic) {
-		return Consumer.plainSource(createConsumerSettings(),
-				Subscriptions.assignment(getTopicPartition(topic)));
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
+		if (sharingSources) {
+			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment((getTopicPartition(topic))));
+		} else {
+			return Consumer.plainSource(createConsumerSettings(),
+					(Subscription) Subscriptions.assignment(getTopicPartition(topic)));
+		}
 	}
-	private Source<ConsumerRecord<Object, Object>, Consumer.Control> createNewSource(String topic, long offset) {
-		return Consumer.plainSource(createConsumerSettings(),
-				Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
+
+	private Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, long offset) {
+		if (sharingSources) {
+			return Consumer.plainExternalSource(consumerActor,
+					Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
+		} else {
+			return Consumer.plainSource(createConsumerSettings(),
+					(Subscription) Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
+		}
 	}
 
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
-		return ConsumerSettings.create(system, new KafkaAvroDeserializer(schemaRegistry), new KafkaAvroDeserializer(schemaRegistry))
-        .withBootstrapServers(kafkaUrl)
-        .withGroupId("group1")
-        .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+		return ConsumerSettings.create(system, new KafkaAvroDeserializer(schemaRegistry),
+				new KafkaAvroDeserializer(schemaRegistry))
+        		.withBootstrapServers(kafkaUrl)
+        		.withGroupId("group1")
+        		.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 	}
 
 	private TopicPartition getTopicPartition(String topic) {
@@ -128,7 +108,7 @@ public class KafkaComponentsFactory {
 	}
 
 	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> getSink() {
-		if (singleSink){
+		if (sharingSinks){
 			System.out.println("Sharing Sink!");
 			return sink;
 		} else {
