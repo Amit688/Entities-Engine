@@ -9,6 +9,7 @@ import akka.kafka.*;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 
@@ -28,9 +29,8 @@ public class KafkaComponentsFactory {
 	private String kafkaUrl;
 	private final boolean sharingSources;
 	private final boolean sharingSinks;
-	private Map<String, Source<ConsumerRecord<Object, Object>, Consumer.Control>> topicSource;
-	private Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> sink;
 	private ActorRef consumerActor;
+	private KafkaProducer<Object, Object> kafkaProducer = null;
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean sharingSources, boolean sharingSinks) {
@@ -39,12 +39,12 @@ public class KafkaComponentsFactory {
 		this.kafkaUrl = kafkaUrl;
 		this.sharingSources = sharingSources;
 		this.sharingSinks = sharingSinks;
-		this.topicSource = new HashMap<>();
 		if (this.sharingSources) {
 			this.consumerActor = system.actorOf((KafkaConsumerActor.props(createConsumerSettings())));
 		}
 		if (this.sharingSinks) {
-			this.sink = createNewSink();
+			ProducerSettings<Object, Object> producerSettings = createProducerSettings();
+			this.kafkaProducer = producerSettings.createKafkaProducer();
 		}
 	}
 
@@ -108,19 +108,17 @@ public class KafkaComponentsFactory {
 	}
 
 	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> getSink() {
+		ProducerSettings<Object, Object> producerSettings = createProducerSettings();
 		if (sharingSinks){
-			System.out.println("Sharing Sink!");
-			return sink;
+			return Producer.plainSink(producerSettings, kafkaProducer);
 		} else {
-			System.out.println("Creating new Sink");
-			return createNewSink();
+			return Producer.plainSink(producerSettings);
 		}
 	}
 
-	public Sink<ProducerRecord<Object, Object>, CompletionStage<Done>> createNewSink() {
-		ProducerSettings<Object, Object> producerSettings = ProducerSettings
-				.create(system, new KafkaAvroSerializer(schemaRegistry), new KafkaAvroSerializer(schemaRegistry))
-				.withBootstrapServers(kafkaUrl);
-		return Producer.plainSink(producerSettings);
+	private ProducerSettings<Object, Object> createProducerSettings() {
+		return ProducerSettings
+                    .create(system, new KafkaAvroSerializer(schemaRegistry), new KafkaAvroSerializer(schemaRegistry))
+                    .withBootstrapServers(kafkaUrl);
 	}
 }
