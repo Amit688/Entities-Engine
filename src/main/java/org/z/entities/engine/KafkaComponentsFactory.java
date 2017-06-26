@@ -1,11 +1,13 @@
 package org.z.entities.engine;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 import akka.actor.ActorRef;
 import akka.kafka.*;
+
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -96,7 +98,10 @@ public class KafkaComponentsFactory {
 	}
 
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
-		return ConsumerSettings.create(system, new KafkaAvroDeserializer(schemaRegistry),
+		KafkaAvroDeserializer keyDeserializer = new KafkaAvroDeserializer(schemaRegistry);
+		
+		keyDeserializer.configure(Collections.singletonMap("schema.registry.url", "http://fake-url"), true);
+		return ConsumerSettings.create(system, keyDeserializer,
 				new KafkaAvroDeserializer(schemaRegistry))
         		.withBootstrapServers(kafkaUrl)
         		.withGroupId("group1")
@@ -117,8 +122,10 @@ public class KafkaComponentsFactory {
 	}
 
 	private ProducerSettings<Object, Object> createProducerSettings() {
+		KafkaAvroSerializer keySerializer = new KafkaAvroSerializer(schemaRegistry);
+		keySerializer.configure(Collections.singletonMap("schema.registry.url", "http://fake-url"), true);
 		return ProducerSettings
-                    .create(system, new KafkaAvroSerializer(schemaRegistry), new KafkaAvroSerializer(schemaRegistry))
+                    .create(system, keySerializer, new KafkaAvroSerializer(schemaRegistry))
                     .withBootstrapServers(kafkaUrl);
 	}
 }
