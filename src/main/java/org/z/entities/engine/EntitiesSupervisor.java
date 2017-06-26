@@ -68,7 +68,13 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		System.out.println("failed to process event of type " + Objects.toString(event.getType()));
     		e.printStackTrace();
     	}
+    	
+    
     }
+    
+    public Map<UUID, StreamDescriptor> getStreams() {
+		return streams;
+	}
     
     public void create(GenericRecord data) {
     	System.out.println("DATA IS: \n" + data.toString());
