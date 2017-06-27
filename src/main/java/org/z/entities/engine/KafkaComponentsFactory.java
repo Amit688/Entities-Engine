@@ -33,6 +33,11 @@ public class KafkaComponentsFactory {
 	private final boolean sharingSinks;
 	private ActorRef consumerActor;
 	private KafkaProducer<Object, Object> kafkaProducer = null;
+	private static int sourceCounter;
+	
+	static {		
+		sourceCounter = 0;		
+	}
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean sharingSources, boolean sharingSinks) {
@@ -80,7 +85,7 @@ public class KafkaComponentsFactory {
 
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic,boolean isToCheckSharing) {
 		if (sharingSources && isToCheckSharing) {
-			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment((getTopicPartition(topic))));
+			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(new TopicPartition(topic, sourceCounter)));
 		} else {
 			return Consumer.plainSource(createConsumerSettings(),
 					(Subscription) Subscriptions.assignment(getTopicPartition(topic)));
