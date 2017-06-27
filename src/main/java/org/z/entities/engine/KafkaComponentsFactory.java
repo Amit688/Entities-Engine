@@ -85,6 +85,7 @@ public class KafkaComponentsFactory {
 
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic,boolean isToCheckSharing) {
 		if (sharingSources && isToCheckSharing) {
+			sourceCounter++;
 			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(new TopicPartition(topic, sourceCounter)));
 		} else {
 			return Consumer.plainSource(createConsumerSettings(),
