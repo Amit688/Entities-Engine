@@ -20,9 +20,20 @@ repositories {
 }
 
 dependencies {
+
+/*
 	compile 'com.typesafe.akka:akka-stream_2.11:2.4.17'
 	compile group: 'org.apache.kafka', name: 'kafka-streams', version: '0.10.2.0'
 	compile group: "com.typesafe.akka", name: "akka-stream-kafka_2.11", version: "0.14"
+
+*/
+
+    compile group: 'com.typesafe.akka', name: 'akka-actor_2.11', version: '2.5.2'
+    compile group: 'com.typesafe.akka', name: 'akka-stream_2.11', version: '2.5.2'
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '0.10.2.1'
+    compile group: 'org.apache.kafka', name: 'kafka-streams', version: '0.10.2.1'
+    compile group: "com.typesafe.akka", name: "akka-stream-kafka_2.11", version: '0.16'
+
 	compile "org.apache.avro:avro:1.8.1"
 	compile "io.confluent:kafka-avro-serializer:3.2.0"
 	compile "io.confluent:kafka-schema-registry:3.2.0"
