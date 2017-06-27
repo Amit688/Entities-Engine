@@ -109,7 +109,7 @@ public class Main {
 
 	private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
 			String topic, EntitiesEvent.Type type) {
-		return sourceFactory.getSource(topic)
+		return sourceFactory.getSource(topic,false)
 				.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
 	}
 

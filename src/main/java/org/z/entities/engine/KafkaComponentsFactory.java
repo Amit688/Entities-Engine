@@ -59,7 +59,7 @@ public class KafkaComponentsFactory {
 	 * @return
 	 */
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId) {
-		return getSource(topic).filter(record -> filterByReportsId(record, reportsId));
+		return getSource(topic,true).filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	private boolean filterByReportsId(ConsumerRecord<Object, Object> incomingUpdate, String reportsId) {
@@ -78,8 +78,8 @@ public class KafkaComponentsFactory {
 		return getSource(descriptor.getSensorId(), descriptor.getReportsId());
 	}
 
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
-		if (sharingSources) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic,boolean isToCheckSharing) {
+		if (sharingSources && isToCheckSharing) {
 			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment((getTopicPartition(topic))));
 		} else {
 			return Consumer.plainSource(createConsumerSettings(),
