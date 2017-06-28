@@ -5,13 +5,13 @@ import akka.NotUsed;
 import akka.actor.ActorSystem;
 import akka.stream.*;
 import akka.stream.javadsl.*;
-import akka.util.ByteString;
-import scala.concurrent.forkjoin.ThreadLocalRandom;
+import akka.util.ByteString; 
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class WritePrimes {
   public static void main(String[] args) throws IOException {
