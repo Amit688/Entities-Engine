@@ -25,3 +25,11 @@ spec:
           value: "true"
         - name: SINGLE_SINK
           value: "true"
+        - name: KAMON_ENABLED
+          value: "false"
+        - name: JAVA_OPTIONS
+          value: "-Xmx1024m"
+        ports:
+        - containerPort: 5001
+          name: "jvm-debug"
+          
