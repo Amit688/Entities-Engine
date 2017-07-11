@@ -39,11 +39,6 @@ public class KafkaComponentsFactory {
 	private final boolean sharingSinks;
 	private ActorRef consumerActor;
 	private KafkaProducer<Object, Object> kafkaProducer = null;
-	private static int sourceCounter;
-	
-	static {		
-		sourceCounter = 0;		
-	}
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean sharingSources, boolean sharingSinks) {
@@ -70,7 +65,8 @@ public class KafkaComponentsFactory {
 	 * @return
 	 */
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId) {
-		return getSource(topic,getLastOffestForTopic(topic)).filter(record -> filterByReportsId(record, reportsId));
+		//return getSource(topic,getLastOffestForTopic(topic)).filter(record -> filterByReportsId(record, reportsId));
+		return getSource(topic,true).filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	private boolean filterByReportsId(ConsumerRecord<Object, Object> incomingUpdate, String reportsId) {
@@ -91,7 +87,7 @@ public class KafkaComponentsFactory {
 
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic,boolean flag) {
 		if (sharingSources) {
-			sourceCounter++;
+ 
 			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(new TopicPartition(topic, 0)));
 		} else {
 			return Consumer.plainSource(createConsumerSettings(),
