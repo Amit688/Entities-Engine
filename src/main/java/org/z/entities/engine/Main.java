@@ -109,7 +109,7 @@ public class Main {
 
 	private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
 			String topic, EntitiesEvent.Type type) {
-		return sourceFactory.getSource(topic,false)
+		return sourceFactory.getSource(topic)
 				.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
 	}
 
@@ -277,7 +277,8 @@ public class Main {
 							+ "\"doc\": \"This is a schema for entity detection report event\", " 
 							+ "\"fields\": ["
 							+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, " 
-							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
+							+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
 							+ "]}"));
 			schemaRegistry.register("mergeEvent",
 					parser.parse("{\"type\": \"record\", "
@@ -368,7 +369,8 @@ public class Main {
 						+ "\"doc\": \"This is a schema for entity detection report event\", "
 						+ "\"fields\": ["
 						+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, "
-						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
+						+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
 						+ "]}"));
 		schemaRegistry.register("basicEntityAttributes",
 				parser.parse("{\"type\": \"record\","

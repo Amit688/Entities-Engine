@@ -64,9 +64,8 @@ public class KafkaComponentsFactory {
 	 * @param reportsId
 	 * @return
 	 */
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId) {
-		//return getSource(topic,getLastOffestForTopic(topic)).filter(record -> filterByReportsId(record, reportsId));
-		return getSource(topic,true).filter(record -> filterByReportsId(record, reportsId));
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId,long dataOffset) {
+		return getSource(topic,dataOffset).filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	private boolean filterByReportsId(ConsumerRecord<Object, Object> incomingUpdate, String reportsId) {
@@ -82,10 +81,10 @@ public class KafkaComponentsFactory {
 	 * @return
 	 */
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(SourceDescriptor descriptor) {
-		return getSource(descriptor.getSensorId(), descriptor.getReportsId());
+		return getSource(descriptor.getSensorId(), descriptor.getReportsId(),descriptor.getDataOffset());
 	}
 
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic,boolean flag) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
 		if (sharingSources) {
  
 			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(new TopicPartition(topic, 0)));
@@ -138,39 +137,4 @@ public class KafkaComponentsFactory {
                     .withBootstrapServers(kafkaUrl);
 	}
 	
-	private long getLastOffestForTopic(String topic) {
-
-		TopicPartition partition = new TopicPartition(topic, 0);
-
-		Properties props = getProperties(false);   
-		long lastOffset;
-
-		try(KafkaConsumer<Object, Object> consumer = new KafkaConsumer<Object, Object>(props)) {
-			consumer.assign(Arrays.asList(partition));
-			consumer.seekToEnd(Arrays.asList(partition));
-			lastOffset  = consumer.position(partition); 
-		}
-
-		return lastOffset;
-	}
-
-	private Properties getProperties(boolean isAvro) {
-
-		Properties props = new Properties();
-		props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, System.getenv("KAFKA_ADDRESS"));
-		props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-				StringSerializer.class);
-		props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-				StringDeserializer.class);
-		props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-					io.confluent.kafka.serializers.KafkaAvroSerializer.class);
-		props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-				io.confluent.kafka.serializers.KafkaAvroDeserializer.class);
- 	
-		props.put("schema.registry.url", System.getenv("SCHEMA_REGISTRY_ADDRESS"));
-		props.put("group.id", "group1");
-
-		return props;
-	}
-
 }
