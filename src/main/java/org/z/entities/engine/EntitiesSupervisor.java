@@ -81,6 +81,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
+				(long)data.get("dataOffset"),
 				UUID.randomUUID());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
 		createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "NONE");
@@ -141,7 +142,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		GenericRecord attributes = (GenericRecord) son.get("entityAttributes");
 		String externalSystemID = attributes.get("externalSystemID").toString();
 		String sourceName = ((GenericRecord) attributes.get("basicAttributes")).get("sourceName").toString();
-		return new SourceDescriptor(sourceName, externalSystemID, uuid);
+		return new SourceDescriptor(sourceName, externalSystemID,0, uuid);
 	}
 	
 	private SourceShape<ConsumerRecord<Object, Object>> createMergedSourceGraph(

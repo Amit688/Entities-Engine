@@ -15,6 +15,9 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+
 import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
@@ -29,7 +32,7 @@ import akka.stream.javadsl.GraphDSL;
 import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
-import akka.stream.javadsl.Source;
+import akka.stream.javadsl.Source; 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -51,8 +54,9 @@ public class Main {
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
 		//final ActorSystem system = ActorSystem.create();
-		Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-        	final ActorSystem system = ActorSystem.create("sys", cfg);
+		
+    Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+    final ActorSystem system = ActorSystem.create("sys", cfg);
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
@@ -113,7 +117,7 @@ public class Main {
 
 	private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
 			String topic, EntitiesEvent.Type type) {
-		return sourceFactory.getSource(topic,false)
+		return sourceFactory.getSource(topic)
 				.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
 	}
 
@@ -281,7 +285,8 @@ public class Main {
 							+ "\"doc\": \"This is a schema for entity detection report event\", " 
 							+ "\"fields\": ["
 							+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, " 
-							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
+							+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
 							+ "]}"));
 			schemaRegistry.register("mergeEvent",
 					parser.parse("{\"type\": \"record\", "
@@ -372,7 +377,8 @@ public class Main {
 						+ "\"doc\": \"This is a schema for entity detection report event\", "
 						+ "\"fields\": ["
 						+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, "
-						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"}"
+						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
+						+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
 						+ "]}"));
 		schemaRegistry.register("basicEntityAttributes",
 				parser.parse("{\"type\": \"record\","
