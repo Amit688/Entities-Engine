@@ -12,6 +12,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 
 import akka.Done;
 import akka.NotUsed;
