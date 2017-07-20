@@ -12,6 +12,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -53,8 +55,8 @@ public class Main {
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
 		//final ActorSystem system = ActorSystem.create();
 		
-        Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-        final ActorSystem system = ActorSystem.create("sys", cfg);
+    Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+    final ActorSystem system = ActorSystem.create("sys", cfg);
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
