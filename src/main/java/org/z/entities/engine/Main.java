@@ -51,12 +51,19 @@ public class Main {
 		System.out.println("SINGLE_SOURCE_PER_TOPIC::::::::" + System.getenv("SINGLE_SOURCE_PER_TOPIC"));
 		System.out.println("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
 		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
+		System.out.println("CONF_IND::::::::" + System.getenv("CONF_IND"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
-		final ActorSystem system = ActorSystem.create();
+
+		final ActorSystem system;
 		
-    		//Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-    		//final ActorSystem system = ActorSystem.create("sys", cfg);
+		if(System.getenv("CONF_IND").equalsIgnoreCase("true")) {
+	        	Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+	       		 system = ActorSystem.create("sys", cfg);	
+		}
+		else {
+			system = ActorSystem.create();
+		}
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
