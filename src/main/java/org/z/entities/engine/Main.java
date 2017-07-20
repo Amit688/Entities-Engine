@@ -53,10 +53,10 @@ public class Main {
 		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
-		//final ActorSystem system = ActorSystem.create();
+		final ActorSystem system = ActorSystem.create();
 		
-    		Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-    		final ActorSystem system = ActorSystem.create("sys", cfg);
+    		//Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+    		//final ActorSystem system = ActorSystem.create("sys", cfg);
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
