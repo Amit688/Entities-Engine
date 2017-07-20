@@ -13,6 +13,9 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+
 import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
@@ -27,7 +30,7 @@ import akka.stream.javadsl.GraphDSL;
 import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Merge;
 import akka.stream.javadsl.Sink;
-import akka.stream.javadsl.Source;
+import akka.stream.javadsl.Source; 
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -48,7 +51,10 @@ public class Main {
 		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
-		final ActorSystem system = ActorSystem.create();
+		//final ActorSystem system = ActorSystem.create();
+		
+        Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+        final ActorSystem system = ActorSystem.create("sys", cfg);
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
