@@ -34,7 +34,7 @@ dependencies {
     compile group: 'org.apache.kafka', name: 'kafka-streams', version: '0.10.2.1'
     compile group: "com.typesafe.akka", name: "akka-stream-kafka_2.12", version: '0.16'
  
-    compile 'org.scala-lang:scala-library:2.12.2'
+    compile 'org.scala-lang:scala-library:2.11.11'
  	
 
 	compile "org.apache.avro:avro:1.8.1"
