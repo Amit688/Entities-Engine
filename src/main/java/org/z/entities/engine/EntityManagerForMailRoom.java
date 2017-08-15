@@ -17,7 +17,7 @@ import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-public class EntityManager implements Function<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>> {
+public class EntityManagerForMailRoom implements Function<GenericRecord, ProducerRecord<Object, Object>> {
 	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
 	private static Schema GENERAL_ATTRIBUTES__SCHEMA = null;
 	private static Schema SYSTEM_ENTITY_SCHEMA = null;
@@ -32,7 +32,7 @@ public class EntityManager implements Function<ConsumerRecord<Object, Object>, P
 	private String stateChange;
 	private Map<UUID, GenericRecord> entities; 
 	
-	public EntityManager(UUID uuid, String StateChange, List<SourceDescriptor> sources, Map<UUID, GenericRecord> entities) {
+	public EntityManagerForMailRoom(UUID uuid, String StateChange, List<SourceDescriptor> sources, Map<UUID, GenericRecord> entities) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
 		preferredSource = null;
@@ -47,29 +47,16 @@ public class EntityManager implements Function<ConsumerRecord<Object, Object>, P
 			entities.remove(source.getSystemUUID());
 		}
 	}
-
-//	public EntityManager(UUID uuid, String StateChange, Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-//		this.uuid = uuid;
-//		this.stateChange = StateChange;
-//		initSons(sonsAttributes);
-//		preferredSource = null;
-//	}
-//
-//	private void initSons(Map<SourceDescriptor, GenericRecord> sonsAttributes) {
-//		sons = new HashMap<>();
-//		for (Map.Entry<SourceDescriptor, GenericRecord> sonAttributes : sonsAttributes.entrySet()) {
-//			sons.put(sonAttributes.getKey(), sonAttributes.getValue());
-//		}
-//	}
+ 
 
 	@Override
-	public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {
+	public ProducerRecord<Object, Object> apply(GenericRecord data) {
 		try {
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
 			for (SourceDescriptor e: sons.keySet())
 				System.out.println("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
-			GenericRecord data = (GenericRecord) record.value();
+		//	GenericRecord data = (GenericRecord) record.value();
 			this.entities.put(uuid, data);
 			SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
 			preferredSource = sourceDescriptor;
@@ -212,5 +199,6 @@ public class EntityManager implements Function<ConsumerRecord<Object, Object>, P
 					+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 				+ "]}");
 	}
+ 
 
 }

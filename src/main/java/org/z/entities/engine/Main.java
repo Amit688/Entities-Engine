@@ -2,7 +2,11 @@ package org.z.entities.engine;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
@@ -12,8 +16,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -22,6 +24,9 @@ import akka.Done;
 import akka.NotUsed;
 import akka.actor.ActorSystem;
 import akka.kafka.ProducerSettings;
+import akka.kafka.Subscription;
+import akka.kafka.Subscriptions;
+import akka.kafka.javadsl.Consumer;
 import akka.kafka.javadsl.Producer;
 import akka.stream.ActorMaterializer;
 import akka.stream.Materializer;
@@ -44,6 +49,8 @@ import kamon.Kamon;
  */
 public class Main {
 
+	public static boolean testing = false;
+
 	public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
 		System.out.println("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
 		System.out.println("SCHEMA_REGISTRY_ADDRESS::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
@@ -52,41 +59,53 @@ public class Main {
 		System.out.println("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
 		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
 		System.out.println("CONF_IND::::::::" + System.getenv("CONF_IND"));
+		System.out.println("INTERFACES_NAME::::::::" + System.getenv("INTERFACES_NAME"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
+		final ActorSystem system; 
+		final SchemaRegistryClient schemaRegistry;
+		final KafkaComponentsFactory sourceFactory;
 
-		final ActorSystem system;
-		
-		if(System.getenv("CONF_IND").equalsIgnoreCase("true")) {
-	        	Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-	       		 system = ActorSystem.create("sys", cfg);	
+		if(!testing) {
+
+			if(System.getenv("CONF_IND").equalsIgnoreCase("true")) {
+				Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
+				system = ActorSystem.create("sys", cfg);	
+			}
+			else {
+				system = ActorSystem.create();
+			} 
+			schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
+			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
+					System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
+					Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
+
+			if (isKamonEnabled) {
+				Kamon.start();
+			}
+
 		}
 		else {
 			system = ActorSystem.create();
+			schemaRegistry = new MockSchemaRegistryClient();
+			registerSchemas(schemaRegistry);
+			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
+					"192.168.0.51:9092", false,false);
 		}
+
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
-		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-				System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
-				Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
-
-		if (isKamonEnabled) {
-			Kamon.start();
+		
+		Map<String,BackOffice> backOfficeMap = new HashMap<>();
+		StringTokenizer st = new StringTokenizer(System.getenv("INTERFACES_NAME"), ",");
+		while(st.hasMoreElements()){			
+			String sourceName = st.nextToken();
+			backOfficeMap.put(sourceName,createBackOfficeStream(materializer,sourceFactory,sourceName,system)); 
 		}
 
-		/* To run local via eclipse
-
-		final ActorSystem system = ActorSystem.create();
-        final ActorMaterializer materializer = ActorMaterializer.create(system);
-        final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-        registerSchemas(schemaRegistry);
-        final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-                        "192.168.0.51:9092", false,false);
-
-		 */
-
-		EntitiesSupervisor supervisor = createSupervisorStream(materializer, sourceFactory);
+		EntitiesSupervisor supervisor = createSupervisorStream(materializer, sourceFactory,backOfficeMap);
 		//writeSomeData(system, materializer, schemaRegistry,supervisor);
+		writeSomeDataForMailRoom(system, materializer, schemaRegistry,supervisor);
+
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -102,7 +121,19 @@ public class Main {
 		}
 	}
 
-	private static EntitiesSupervisor createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory) {
+	private static BackOffice createBackOfficeStream(ActorMaterializer materializer,KafkaComponentsFactory sourceFactory,String sourceName, ActorSystem system) {
+
+		Source<GenericRecord, ?> source =  sourceFactory.getSource(sourceName)
+				.via(Flow.fromFunction(r -> (GenericRecord) r.value()));
+
+		BackOffice backOffice = new BackOffice(sourceName,materializer,system);		
+		source.to(Sink.foreach(backOffice::accept))
+		.run(materializer);
+
+		return backOffice;
+	}
+
+	private static EntitiesSupervisor createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, Map<String, BackOffice> backOfficeMap) {
 		Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(sourceFactory, "creation", EntitiesEvent.Type.CREATE);
 		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
 		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
@@ -114,7 +145,7 @@ public class Main {
 			return SourceShape.of(merger.out());
 		}));
 
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory,backOfficeMap);
 		combinedSource
 		.to(Sink.foreach(supervisor::accept))
 		.run(materializer);
@@ -144,6 +175,7 @@ public class Main {
 		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
 		.set("sourceName", "source1")
 		.set("externalSystemID", "id1")
+		.set("dataOffset", 444L)
 		.build();
 		ProducerRecord<String, Object> producerRecord = new ProducerRecord<String, Object>("creation", creationRecord);
 		Source.from(Arrays.asList(producerRecord))
@@ -276,6 +308,209 @@ public class Main {
 		.run(materializer);
 
 	}
+
+	private static void writeSomeDataForMailRoom(ActorSystem system, Materializer materializer, 
+			SchemaRegistryClient schemaRegistry, EntitiesSupervisor supervisor) throws IOException, RestClientException {
+		ProducerSettings<String, Object> producerSettings = ProducerSettings
+				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
+				.withBootstrapServers("192.168.0.51:9092");
+		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
+
+		Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");
+		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
+		.set("sourceName", "source1")
+		.set("externalSystemID", "id1")
+		.set("dataOffset", 444L)
+		.build();
+		/*	ProducerRecord<String, Object> producerRecord = new ProducerRecord<String, Object>("creation", creationRecord);
+		Source.from(Arrays.asList(producerRecord))
+		.to(sink)
+		.run(materializer);
+
+		GenericRecord creationRecord2 = new GenericRecordBuilder(creationSchema)
+		.set("sourceName", "source2")
+		.set("externalSystemID", "id1")
+		.build();
+		producerRecord = new ProducerRecord<String, Object>("creation", creationRecord2);
+		Source.from(Arrays.asList(producerRecord))
+		.to(sink)
+		.run(materializer);
+		 */
+		for(int i = 0 ; i < 2; i++) {
+
+			Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
+			Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
+			long x = i;
+			GenericRecord coordinate = new GenericRecordBuilder(coordinateSchema)
+			.set("lat", 4.5d+x)
+			.set("long", 3.4d+x)
+			.build();
+			GenericRecord basicAttributes = new GenericRecordBuilder(basicAttributesSchema)
+			.set("coordinate", coordinate)
+			.set("isNotTracked", false)
+			.set("entityOffset", 50l)
+			.set("sourceName", "source1")
+			.build();
+			Schema dataSchema = getSchema(schemaRegistry, "generalEntityAttributes");
+			Schema nationalitySchema = dataSchema.getField("nationality").schema();
+			Schema categorySchema = dataSchema.getField("category").schema();
+			GenericRecord dataRecord = new GenericRecordBuilder(dataSchema)
+			.set("basicAttributes", basicAttributes)
+			.set("speed", 4.7)
+			.set("elevation", 7.8)
+			.set("course", 8.3)
+			.set("nationality", new GenericData.EnumSymbol(nationalitySchema, "USA"))
+			.set("category", new GenericData.EnumSymbol(categorySchema, "boat"))
+			.set("pictureURL", "huh?")
+			.set("height", 6.1)
+			.set("nickname", "rerere")
+			.set("externalSystemID", "id1_source1")
+			.build();
+
+			ProducerRecord<String, Object> producerRecord3 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+			Source.from(Arrays.asList(producerRecord3))
+			.to(sink)
+			.run(materializer);
+
+			try {
+				Thread.sleep(5000);
+			} catch (Exception e) {
+
+			}
+
+		}
+
+		for(int i = 0 ; i < 2; i++) {
+
+			Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
+			Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
+			long x = i;
+			GenericRecord coordinate = new GenericRecordBuilder(coordinateSchema)
+			.set("lat", 4.5d+x)
+			.set("long", 3.4d+x)
+			.build();
+			GenericRecord basicAttributes = new GenericRecordBuilder(basicAttributesSchema)
+			.set("coordinate", coordinate)
+			.set("isNotTracked", false)
+			.set("entityOffset", 50l)
+			.set("sourceName", "source0")
+			.build();
+			Schema dataSchema = getSchema(schemaRegistry, "generalEntityAttributes");
+			Schema nationalitySchema = dataSchema.getField("nationality").schema();
+			Schema categorySchema = dataSchema.getField("category").schema();
+			GenericRecord dataRecord = new GenericRecordBuilder(dataSchema)
+			.set("basicAttributes", basicAttributes)
+			.set("speed", 4.7)
+			.set("elevation", 7.8)
+			.set("course", 8.3)
+			.set("nationality", new GenericData.EnumSymbol(nationalitySchema, "USA"))
+			.set("category", new GenericData.EnumSymbol(categorySchema, "boat"))
+			.set("pictureURL", "huh?")
+			.set("height", 6.1)
+			.set("nickname", "rerere")
+			.set("externalSystemID", "id1_source_0")
+			.build(); 
+
+			ProducerRecord<String, Object> producerRecord3 = new ProducerRecord<String, Object>("source0", dataRecord);
+
+			Source.from(Arrays.asList(producerRecord3))
+			.to(sink)
+			.run(materializer);
+
+			try {
+				Thread.sleep(5000);
+			} catch (Exception e) {
+
+			}
+
+		}
+
+		/*	producerRecord2 = new ProducerRecord<String, Object>("source2", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+		.to(sink)
+		.run(materializer);
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+
+
+		Set<UUID> uuidSet = supervisor.getStreams().keySet();
+		UUID[] array = uuidSet.stream().toArray(UUID[]::new);
+
+		Schema mergeSchema = getSchema(schemaRegistry, "mergeEvent");
+		GenericRecord mergeRecord = new GenericRecordBuilder(mergeSchema)
+		//.set("mergedEntitiesId", Arrays.asList("38400000-8cf0-11bd-b23f-0b96e4ef00e1",
+		//		"38400000-8cf0-11bd-b23f-0b96e4ef00e2"))
+		.set("mergedEntitiesId", Arrays.asList(array[0].toString(), array[1].toString()))
+		.build();
+		ProducerRecord<String, Object>   producerRecord = new ProducerRecord<String, Object>("merge", mergeRecord);
+		Source.from(Arrays.asList(producerRecord))
+		.to(sink)
+		.run(materializer);
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+		.to(sink)
+		.run(materializer);
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+		.to(sink)
+		.run(materializer);
+
+
+		try {
+			Thread.sleep(10000);
+		} catch (Exception e) {
+
+		}
+
+		uuidSet = supervisor.getStreams().keySet();
+		array = uuidSet.stream().toArray(UUID[]::new);
+
+		Schema splitSchema = getSchema(schemaRegistry, "splitEvent");
+		GenericRecord splitRecord = new GenericRecordBuilder(splitSchema)
+		//.set("splittedEntityID", "38400000-8cf0-11bd-b23f-0b96e4ef00e1")
+		.set("splittedEntityID", array[0].toString())
+		.build();
+		producerRecord = new ProducerRecord<String, Object>("split", splitRecord);
+		Source.from(Arrays.asList(producerRecord))
+		.to(sink)
+		.run(materializer);
+
+		try {
+			Thread.sleep(5000);
+		} catch (Exception e) {
+
+		}
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+		.to(sink)
+		.run(materializer);
+
+		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
+
+		Source.from(Arrays.asList(producerRecord2))
+		.to(sink)
+		.run(materializer);
+		 */
+	}
+
 
 	private static Schema getSchema(SchemaRegistryClient schemaRegistry, String name) throws IOException, RestClientException {
 		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();

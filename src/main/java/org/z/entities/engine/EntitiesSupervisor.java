@@ -15,10 +15,12 @@ import org.apache.avro.util.Utf8;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import akka.NotUsed;
+import akka.japi.function.Procedure;
 import akka.kafka.javadsl.Consumer;
 import akka.stream.KillSwitches;
 import akka.stream.Materializer;
 import akka.stream.Outlet;
+import akka.stream.OverflowStrategy;
 import akka.stream.SourceShape;
 import akka.stream.UniformFanInShape;
 import akka.stream.UniqueKillSwitch;
@@ -27,7 +29,10 @@ import akka.stream.javadsl.GraphDSL;
 import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Keep;
 import akka.stream.javadsl.Merge;
+import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
+import akka.stream.javadsl.SourceQueue;
+import akka.stream.javadsl.SourceQueueWithComplete;
 
 
 /**
@@ -38,17 +43,20 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     private KafkaComponentsFactory componentsFactory;
     private Map<UUID, StreamDescriptor> streams;
     private Map<UUID, GenericRecord> entities;
+    private Map<String, BackOffice> backOfficeMap;
     
-    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory) {
+    public EntitiesSupervisor(Materializer materializer, KafkaComponentsFactory componentsFactory, Map<String, BackOffice> backOfficeMap) {
         this.materializer = materializer;
         this.componentsFactory = componentsFactory;
         streams = new ConcurrentHashMap<>();
         this.entities = new HashMap<>();
+        this.backOfficeMap = backOfficeMap;
     }
 
     @Override
     public void accept(EntitiesEvent event) {
     	try {
+    		
     		GenericRecord data = event.getData();
 	    	switch (event.getType()) {
 			case CREATE:
@@ -84,7 +92,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 				(long)data.get("dataOffset"),
 				UUID.randomUUID());
 		System.out.println("creating entity manager stream for source " + sourceDescriptor);
-		createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "NONE");
+		createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "NONE",data.get("sourceName").toString());
     }
     
     private void merge(GenericRecord data) {
@@ -97,7 +105,7 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		List<SourceDescriptor> sonsSources = killAndFlattenSonsAttributes(uuidsToMerge);
     		Source<ConsumerRecord<Object, Object>, NotUsed> mergedSource =
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sonsSources)));
-    		createStream(mergedSource, sonsSources, UUID.randomUUID(), "MERGED");
+    		createStream(mergedSource, sonsSources, UUID.randomUUID(), "MERGED",data.get("sourceName").toString());
     	} else {
     		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
@@ -172,32 +180,50 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
 		Boolean first = true;
     	for (SourceDescriptor sourceDescriptor : splittedStream.getSourceDescriptors()) {
     		if (first) {
-				createStream(sourceDescriptor, uuidToSplit, "SON_TAKEN");
+				createStream(sourceDescriptor, uuidToSplit, "SON_TAKEN",data.get("sourceName").toString());
 				first = false;
 			} else {
-				createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "WAS_SPLIT");
+				createStream(sourceDescriptor, sourceDescriptor.getSystemUUID(), "WAS_SPLIT",data.get("sourceName").toString());
 			}
     	}
     }
     
-    private void createStream(SourceDescriptor sourceDescriptor, UUID uuid, String stateChange) {
+    private void createStream(SourceDescriptor sourceDescriptor, UUID uuid, String stateChange,String sourceName) {
     	createStream(componentsFactory.getSource(sourceDescriptor), Arrays.asList(sourceDescriptor), uuid,
-				stateChange);
+				stateChange,sourceName);  
     }
     
     private void createStream(Source<ConsumerRecord<Object, Object>, ?> source,
-			List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-    	EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, entities);
+    		List<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange,String sourceName) {
+    	//EntityManager entityManager = new EntityManager(uuid, stateChange, sourceDescriptors, entities);
+    	EntityManagerForMailRoom entityManagerForMailRoom = new EntityManagerForMailRoom(uuid, stateChange, sourceDescriptors, entities);
+ 
+     /*
     	UniqueKillSwitch killSwitch = source
+
     			.viaMat(KillSwitches.single(), Keep.right())
     			.via(Flow.fromFunction(entityManager::apply))
     			.to(componentsFactory.getSink())
-    			.run(materializer);
-    	
-    	System.out.println("storing stream descriptor for later use");
-    	streams.put(uuid, 
-    			new StreamDescriptor(killSwitch, uuid, sourceDescriptors));
-	}
+    			.run(materializer);	  
+    	*/
+		SourceQueue<GenericRecord> sourceQueue=
+				Source.<GenericRecord>queue(Integer.MAX_VALUE, OverflowStrategy.backpressure())	
+				.via(Flow.fromFunction(entityManagerForMailRoom::apply))
+				.to(componentsFactory.getSink())
+				.run(materializer);
+		
+		sourceDescriptors.get(0).setSourceQueue(sourceQueue);
+		
+		backOfficeMap.get(sourceName).updateTheSourceQueue(sourceDescriptors.get(0).getReportsId(), sourceQueue);
+		
+		 
+		
+    //	System.out.println("storing stream descriptor for later use");
+    	// streams.put(uuid, 
+    	//		new StreamDescriptor(killSwitch, uuid, sourceDescriptors)); 
+ 
+   
+    }
     
 //    private void createStream(Source<ConsumerRecord<String, Object>, ?> source,
 //			Map<SourceDescriptor, GenericRecord> sonsAttributes, UUID uuid, String stateChange) {
