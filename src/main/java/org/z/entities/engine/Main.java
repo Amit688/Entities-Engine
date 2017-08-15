@@ -104,7 +104,7 @@ public class Main {
 
 		EntitiesSupervisor supervisor = createSupervisorStream(materializer, sourceFactory,backOfficeMap);
 		//writeSomeData(system, materializer, schemaRegistry,supervisor);
-		writeSomeDataForMailRoom(system, materializer, schemaRegistry,supervisor);
+		//writeSomeDataForMailRoom(system, materializer, schemaRegistry,supervisor);
 
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
