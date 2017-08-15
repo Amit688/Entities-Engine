@@ -85,7 +85,7 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 			dataMap.get(externalSystemId).setRight(queue);	
 			ConcurrentLinkedQueue<GenericRecord> linkedQueue = dataMap.get(externalSystemId).getLeft();
 			while(!linkedQueue.isEmpty()) {
-				System.out.println("Offer from backlog queue");
+				System.out.println("Offer from backlog queue in update Queue");
 				queue.offer(linkedQueue.poll());				
 			}			
 		}	
