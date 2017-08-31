@@ -40,8 +40,7 @@ public class SourceDescriptor {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((reportsId == null) ? 0 : reportsId.hashCode());
-		result = prime * result + ((sensorId == null) ? 0 : sensorId.hashCode());
-		result = prime * result + ((systemUUID == null) ? 0 : systemUUID.hashCode());
+		result = prime * result + ((sensorId == null) ? 0 : sensorId.hashCode()); 
 		return result;
 	}
 
@@ -70,17 +69,7 @@ public class SourceDescriptor {
 			}
 		} else if (!sensorId.equals(other.sensorId)) {
 			return false;
-		}
-		if (systemUUID == null) {
-			if (other.systemUUID != null) {
-				return false;
-			}
-		} else if (!systemUUID.equals(other.systemUUID)) {
-			return false;
-		}
-		if (dataOffset != other.dataOffset) {
-			return false;
-		}
+		} 
 		return true;
 	}
 

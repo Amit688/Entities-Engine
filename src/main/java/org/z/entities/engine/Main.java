@@ -49,7 +49,7 @@ import kamon.Kamon;
  */
 public class Main {
 
-	public static boolean testing = false;
+	public static boolean testing = true;
 
 	public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
 		System.out.println("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
@@ -104,8 +104,12 @@ public class Main {
 
 		EntitiesSupervisor supervisor = createSupervisorStream(materializer, sourceFactory,backOfficeMap);
 		//writeSomeData(system, materializer, schemaRegistry,supervisor);
-		//writeSomeDataForMailRoom(system, materializer, schemaRegistry,supervisor);
-
+		if(testing) {
+			writeSomeDataForMailRoom(system, materializer, schemaRegistry,supervisor);
+			
+			//backOfficeMap.get("source0").stopSourceQueueStream("id1_source_0");
+		}
+		 
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -425,6 +429,8 @@ public class Main {
 			}
 
 		}
+		
+ 
 
 		/*	producerRecord2 = new ProducerRecord<String, Object>("source2", dataRecord);
 

@@ -30,7 +30,8 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
 	private String stateChange;
-	private Map<UUID, GenericRecord> entities; 
+	private Map<UUID, GenericRecord> entities;  
+	
 	
 	public EntityManagerForMailRoom(UUID uuid, String StateChange, List<SourceDescriptor> sources, Map<UUID, GenericRecord> entities) {
 		this.uuid = uuid;
@@ -51,6 +52,15 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 
 	@Override
 	public ProducerRecord<Object, Object> apply(GenericRecord data) {
+		
+        if( data.get("externalSystemID").toString().equals("STOPME")) {
+
+            System.out.println("EntityManagerForMailRoom got stop me"); 
+
+            return new ProducerRecord<>("update", uuid.toString(), createStopMe());  
+
+        }
+        
 		try {
 			System.out.println("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
 			System.out.println("sons are:");
@@ -199,6 +209,31 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 					+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 				+ "]}");
 	}
+	
+    private GenericRecord createStopMe() {
+
+        List<GenericRecord> sonsRecords = new ArrayList<>();
+        for (SourceDescriptor sonKey : sons.keySet()) {
+                try {
+                        sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
+                } catch (IOException e) {
+
+                        e.printStackTrace();
+                }
+        }
+        GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
+                        .set("entityID", uuid.toString())
+                        .set("entityAttributes", sons.get(preferredSource))
+                        .set("sons", sonsRecords)
+                        .set("stateChanges", "STOPME")
+                        .build();
+        if (!stateChange.equals("NONE")) {
+                stateChange = "NONE";
+        }
+        return family;
+}
+
+	
  
 
 }
