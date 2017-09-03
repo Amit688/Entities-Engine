@@ -1,7 +1,11 @@
 package org.z.entities.engine;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.UUID;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -80,7 +84,7 @@ public class Main {
 //			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
 //					"192.168.0.51:9092", false,false);
 			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-					"localhost:9092", false,false);
+					System.getenv("KAFKA_ADDRESS"), false,false);
 		}
 
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
