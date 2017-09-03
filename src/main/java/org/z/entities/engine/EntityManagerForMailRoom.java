@@ -1,12 +1,7 @@
 package org.z.entities.engine;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 
 import org.apache.avro.Schema;
@@ -16,6 +11,12 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.axonframework.eventhandling.EventBus;
+import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.eventhandling.GenericEventMessage;
+import org.z.entities.engine.sagas.MergeEvents;
+
+import javax.xml.transform.Source;
 
 public class EntityManagerForMailRoom implements Function<GenericRecord, ProducerRecord<Object, Object>> {
 	private static Schema BASIC_ATTRIBUTES_SCHEMA = null;
@@ -30,15 +31,24 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 	private Map<SourceDescriptor, GenericRecord> sons;
 	private SourceDescriptor preferredSource;
 	private String stateChange;
-	private Map<UUID, GenericRecord> entities;  
-	
-	
-	public EntityManagerForMailRoom(UUID uuid, String StateChange, List<SourceDescriptor> sources, Map<UUID, GenericRecord> entities) {
+	private Map<UUID, GenericRecord> entities;
+	private EventBus eventBus;
+
+	public EntityManagerForMailRoom(UUID uuid, String StateChange, List<SourceDescriptor> sources, Map<UUID, GenericRecord> entities,
+									EventBus eventBus) {
 		this.uuid = uuid;
 		this.stateChange = StateChange;
-		preferredSource = null;
-		this.entities = entities; 
+		this.preferredSource = null;
+		this.entities = entities;
+		this.eventBus = eventBus;
 		initSons(sources);
+	}
+
+	public EntityManagerForMailRoom(UUID uuid, String StateChange, List<SourceDescriptor> sources, SourceDescriptor preferredSource,
+									Map<UUID, GenericRecord> entities,
+									EventBus eventBus) {
+		this(uuid, StateChange, sources, entities, eventBus);
+		this.preferredSource = preferredSource;
 	}
 
 	private void initSons(List<SourceDescriptor> sources) {
@@ -48,17 +58,18 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 			entities.remove(source.getSystemUUID());
 		}
 	}
+
+	public Collection<SourceDescriptor> getSonsSources() {
+		return sons.keySet();
+	}
  
 
 	@Override
 	public ProducerRecord<Object, Object> apply(GenericRecord data) {
-		
-        if( data.get("externalSystemID").toString().equals("STOPME")) {
-
-            System.out.println("EntityManagerForMailRoom got stop me"); 
-
-            return new ProducerRecord<>("update", uuid.toString(), createStopMe());  
-
+        if( data.getSchema().getName().equals("stopMeMessage")) {
+        	System.out.println("received stopMe message: " + data);
+        	UUID sagaId = UUID.fromString((String) data.get("sagaId"));
+            return stopStream(sagaId);
         }
         
 		try {
@@ -209,28 +220,47 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 					+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
 				+ "]}");
 	}
+
+	private ProducerRecord<Object, Object> stopStream() {
+		return stopStream(null);
+	}
+
+	private ProducerRecord<Object, Object> stopStream(UUID sagaId) {
+		System.out.println("EntityManagerForMailRoom got stop me");
+		GenericRecord finalState = createStopMe();
+		if (sagaId != null) {
+			System.out.println("sending event to saga " + sagaId);
+			eventBus.publish(new GenericEventMessage<>(new MergeEvents.EntityStopped(sagaId, finalState)));
+		}
+		return new ProducerRecord<>("update", uuid.toString(), finalState);
+	}
 	
     private GenericRecord createStopMe() {
+		List<GenericRecord> sonsRecords = new ArrayList<>();
+		for (SourceDescriptor sonKey : sons.keySet()) {
+			try {
+				sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
+			} catch (IOException e) {
 
-        List<GenericRecord> sonsRecords = new ArrayList<>();
-        for (SourceDescriptor sonKey : sons.keySet()) {
-                try {
-                        sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
-                } catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 
-                        e.printStackTrace();
-                }
-        }
-        GenericRecord family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
-                        .set("entityID", uuid.toString())
-                        .set("entityAttributes", sons.get(preferredSource))
-                        .set("sons", sonsRecords)
-                        .set("stateChanges", "STOPME")
-                        .build();
-        if (!stateChange.equals("NONE")) {
-                stateChange = "NONE";
-        }
-        return family;
+		GenericRecord family = null;
+		try{
+			family = new GenericRecordBuilder(ENTITY_FAMILY_SCHEMA)
+					.set("entityID", uuid.toString())
+					.set("entityAttributes", sons.get(preferredSource))
+					.set("sons", sonsRecords)
+					.set("stateChanges", "STOPME")
+					.build();
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+		}
+		if (!stateChange.equals("NONE")) {
+			stateChange = "NONE";
+		}
+		return family;
 }
 
 	
