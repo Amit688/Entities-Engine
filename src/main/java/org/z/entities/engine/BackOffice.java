@@ -229,7 +229,7 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 		String schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_ADDRESS");
 		String schemaRegistryIdentity = System.getenv("SCHEMA_REGISTRY_IDENTITY");		
 		SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryUrl, Integer.parseInt(schemaRegistryIdentity));
-		name = "org.sourcestream.entities."+name;
+		name = "org.z.entities.schema."+name;
 		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
 		return schemaRegistry.getByID(id);
 	}

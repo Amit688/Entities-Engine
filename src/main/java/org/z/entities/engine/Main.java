@@ -49,7 +49,7 @@ import kamon.Kamon;
  */
 public class Main {
 
-	public static boolean testing = false;
+	public static boolean testing = true;
 
 	public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
 		System.out.println("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
