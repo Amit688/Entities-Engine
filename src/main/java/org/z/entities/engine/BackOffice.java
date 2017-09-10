@@ -10,11 +10,11 @@ import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map; 
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap; 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.avro.Schema;
@@ -36,7 +36,7 @@ import akka.kafka.javadsl.Producer;
 import akka.stream.Materializer;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
-import akka.stream.javadsl.SourceQueue; 
+import akka.stream.javadsl.SourceQueue;
 
 
 /**
@@ -231,7 +231,7 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 		String schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_ADDRESS");
 		String schemaRegistryIdentity = System.getenv("SCHEMA_REGISTRY_IDENTITY");		
 		SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryUrl, Integer.parseInt(schemaRegistryIdentity));
-		name = "org.sourcestream.entities."+name;
+		//name = "org.z.entities.schema."+name;
 		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
 		return schemaRegistry.getByID(id);
 	}
