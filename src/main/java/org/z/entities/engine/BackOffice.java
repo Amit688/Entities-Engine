@@ -1,5 +1,6 @@
 package org.z.entities.engine;
 
+import akka.stream.javadsl.Merge;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -11,11 +12,13 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -97,17 +100,16 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 		}
 	}
 
-	public void stopSourceQueueStream(String externalSystemId) {
+	public void stopSourceQueueStream(String externalSystemId, UUID sagaId) {
 
 		SourceQueue<GenericRecord> sourceQueue = dataMap.get(externalSystemId).getRight();
 		deleteSourceQueue(externalSystemId);
 		System.out.println("stopSourceQueueStream ExternalSystemID "+externalSystemId);
-		sourceQueue.offer(getStopMeMessage());
+		sourceQueue.offer(getStopMeMessage(sagaId));
 
 	}
 
 	private void deleteSourceQueue(String externalSystemId) {
-
 		dataMap.get(externalSystemId).setRight(null);
 	}
 
@@ -155,7 +157,7 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 				SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient(); 
 				ProducerSettings<String, Object> producerSettings = ProducerSettings
 						.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-						.withBootstrapServers("192.168.0.51:9092");
+						.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
 
 				Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
 
@@ -234,98 +236,17 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 		return schemaRegistry.getByID(id);
 	}
 
-	private GenericRecord getStopMeMessage() {
+	private GenericRecord getStopMeMessage(UUID sagaId) {
+		Schema schema = SchemaBuilder.builder().record("stopMeMessage").fields()
+				.optionalString("sagaId")
+				.endRecord();
 
-		Schema dataSchema = null;
-		Schema basicAttributesSchema = null;
-		try {
-			if(testing) {
-
-				SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-				Schema.Parser parser = new Schema.Parser();
-				schemaRegistry.register("basicEntityAttributes",
-						parser.parse("{\"type\": \"record\","
-								+ "\"name\": \"basicEntityAttributes\","
-								+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
-								+ "\"fields\": ["
-								+ "{\"name\": \"coordinate\", \"type\":"
-								+ "{\"type\": \"record\","
-								+ "\"name\": \"coordinate\","
-								+ "\"doc\": \"Location attribute in grid format\","
-								+ "\"fields\": ["
-								+ "{\"name\": \"lat\",\"type\": \"double\"},"
-								+ "{\"name\": \"long\",\"type\": \"double\"}"
-								+ "]}},"
-								+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
-								+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
-								+ "{\"name\": \"sourceName\", \"type\": \"string\"}"
-								+ "]}"));
-				schemaRegistry.register("generalEntityAttributes",
-						parser.parse("{\"type\": \"record\", "
-								+ "\"name\": \"generalEntityAttributes\","
-								+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
-								+ "\"fields\": ["
-								+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
-								+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
-								+ "{\"name\": \"elevation\",\"type\": \"double\"},"
-								+ "{\"name\": \"course\",\"type\": \"double\"},"
-								+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
-								+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
-								+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
-								+ "{\"name\": \"height\",\"type\": \"double\"},"
-								+ "{\"name\": \"nickname\",\"type\": \"string\"},"
-								+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
-								+ "]}"));
-				int id = schemaRegistry.getLatestSchemaMetadata("basicEntityAttributes").getId();
-				basicAttributesSchema = schemaRegistry.getByID(id);
-
-				id = schemaRegistry.getLatestSchemaMetadata("generalEntityAttributes").getId();
-				dataSchema = schemaRegistry.getByID(id);
-
-			}
-			else {
-				basicAttributesSchema = getSchema("basicEntityAttributes");
-			}
-
-			Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
-			GenericRecord coordinate = new GenericRecordBuilder(coordinateSchema)
-			.set("lat", 4.5d)
-			.set("long", 3.4d)
-			.build();
-			GenericRecord basicAttributes = new GenericRecordBuilder(basicAttributesSchema)
-			.set("coordinate", coordinate)
-			.set("isNotTracked", false)
-			.set("entityOffset", 50l)
-			.set("sourceName", "source0")
-			.build();
-
-			Schema nationalitySchema = dataSchema.getField("nationality").schema();
-			Schema categorySchema = dataSchema.getField("category").schema();
-			GenericRecord dataRecord = new GenericRecordBuilder(dataSchema)
-			.set("basicAttributes", basicAttributes)
-			.set("speed", 4.7)
-			.set("elevation", 7.8)
-			.set("course", 8.3)
-			.set("nationality", new GenericData.EnumSymbol(nationalitySchema, "USA"))
-			.set("category", new GenericData.EnumSymbol(categorySchema, "boat"))
-			.set("pictureURL", "huh?")
-			.set("height", 6.1)
-			.set("nickname", "rerere")
-			.set("externalSystemID", "STOPME")
-			.build();
-
-			return dataRecord;
-
-		} catch (IOException | RestClientException e) {
-
-			e.printStackTrace();
+		GenericRecordBuilder builder = new GenericRecordBuilder(schema);
+		if (sagaId != null) {
+			builder.set("sagaId", sagaId.toString());
 		}
-
-		return null;
-
+		return builder.build();
 	}
-
-
 
 }
 
