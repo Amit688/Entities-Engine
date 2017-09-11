@@ -9,7 +9,11 @@ public class DeadLetterActor extends AbstractActor {
 	  public Receive createReceive() {
 	    return receiveBuilder()
 	      .match(DeadLetter.class, msg -> {
-	        System.out.println("I am dead letter "+msg);
+	        System.out.println("I am a dead letter "+msg.toString());
+	        System.out.println("message "+msg.message().toString());
+	        System.out.println("recipient "+msg.recipient().toString());
+	        System.out.println("sender "+msg.sender().toString()); 
+	        
 	      })
 	      .build();
 	  }
