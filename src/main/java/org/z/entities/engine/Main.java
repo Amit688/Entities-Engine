@@ -134,6 +134,7 @@ public class Main {
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
+				System.out.print("addShutdownHook!!!");
 				system.terminate();
 				if (isKamonEnabled) {
 					Kamon.shutdown();
