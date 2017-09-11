@@ -14,7 +14,10 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
 import akka.NotUsed;
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import akka.actor.DeadLetter;
+import akka.actor.Props;
 import akka.stream.ActorMaterializer;
 import akka.stream.SourceShape;
 import akka.stream.UniformFanInShape;
@@ -29,6 +32,7 @@ import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import kamon.Kamon;
+
 import org.axonframework.commandhandling.AsynchronousCommandBus;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.DefaultConfigurer;
@@ -75,6 +79,9 @@ public class Main {
 			if (isKamonEnabled) {
 				Kamon.start();
 			}
+			
+			final ActorRef actor = system.actorOf(Props.create(DeadLetterActor.class));
+			system.eventStream().subscribe(actor, DeadLetter.class);
 
 		}
 		else {
@@ -84,7 +91,7 @@ public class Main {
 //			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
 //					"192.168.0.51:9092", false,false);
 			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-					System.getenv("KAFKA_ADDRESS"), false,false);
+					System.getenv("KAFKA_ADDRESS"), false,false); 
 		}
 
 		final ActorMaterializer materializer = ActorMaterializer.create(system);

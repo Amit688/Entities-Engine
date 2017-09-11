@@ -1,10 +1,7 @@
 package org.z.entities.engine.sagas;
 
-import org.apache.avro.generic.GenericRecord;
-import sun.net.www.content.text.Generic;
-
-import java.util.Collection;
-import java.util.Set;
+import org.apache.avro.generic.GenericRecord; 
+import java.util.Collection; 
 import java.util.UUID;
 
 public class MergeEvents {
