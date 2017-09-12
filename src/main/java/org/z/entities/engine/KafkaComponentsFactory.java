@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 import akka.actor.ActorRef;
 import akka.kafka.*;
@@ -108,10 +109,13 @@ public class KafkaComponentsFactory {
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
 		KafkaAvroDeserializer keyDeserializer = new KafkaAvroDeserializer(schemaRegistry);
 		
-		//Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");		
+		Map<String,String> map = new ConcurrentHashMap<String, String>();
+				
+		map.put("schema.registry.url", "http://fake-url");
+		map.put("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE));
 		//map.put("max.schemas.per.subject", "10000");		
 		//keyDeserializer.configure(map, true);
-		keyDeserializer.configure(Collections.singletonMap("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE)), true);
+		keyDeserializer.configure(map, true);
 		return ConsumerSettings.create(system, keyDeserializer,
 				new KafkaAvroDeserializer(schemaRegistry))
         		.withBootstrapServers(kafkaUrl)
@@ -138,7 +142,11 @@ public class KafkaComponentsFactory {
 		//Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");
 		//Map<String,String> map = Collections.singletonMap("max.schemas.per.subject", "http://fake-url");
 		//map.put("max.schemas.per.subject", "10000"); 
-		keySerializer.configure(Collections.singletonMap("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE)), true);
+		Map<String,String> map = new ConcurrentHashMap<String, String>();
+		
+		map.put("schema.registry.url", "http://fake-url");
+		map.put("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE));
+		keySerializer.configure(map, true);
 		return ProducerSettings
                     .create(system, keySerializer, new KafkaAvroSerializer(schemaRegistry))
                     .withBootstrapServers(kafkaUrl);

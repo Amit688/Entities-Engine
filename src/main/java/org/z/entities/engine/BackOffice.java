@@ -168,10 +168,8 @@ public class BackOffice implements java.util.function.Consumer<GenericRecord>,Cl
 			}
 			else {
 				
-				sendRecord = new ProducerRecord<>("creation",getGenericRecordForCreation(externalSystemId));
-				System.out.println("Before send creation sendRecord :"+sendRecord);
-				producer.send(sendRecord);
-				System.out.println("After send");
+				sendRecord = new ProducerRecord<>("creation",getGenericRecordForCreation(externalSystemId)); 
+				producer.send(sendRecord); 
 			}
 		} catch (IOException | RestClientException e) {
 
