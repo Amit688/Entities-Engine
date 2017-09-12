@@ -13,11 +13,8 @@ import org.apache.avro.generic.GenericRecord;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
-import akka.NotUsed;
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
-import akka.actor.DeadLetter;
-import akka.actor.Props;
+import akka.NotUsed; 
+import akka.actor.ActorSystem; 
 import akka.stream.ActorMaterializer;
 import akka.stream.SourceShape;
 import akka.stream.UniformFanInShape;
@@ -79,17 +76,11 @@ public class Main {
 			if (isKamonEnabled) {
 				Kamon.start();
 			}
-			
-			final ActorRef actor = system.actorOf(Props.create(DeadLetterActor.class));
-			system.eventStream().subscribe(actor, DeadLetter.class);
-
 		}
 		else {
 			system = ActorSystem.create();
 			schemaRegistry = new MockSchemaRegistryClient();
-			registerSchemas(schemaRegistry);
-//			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-//					"192.168.0.51:9092", false,false);
+			registerSchemas(schemaRegistry); 			
 			sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
 					System.getenv("KAFKA_ADDRESS"), false,false); 
 		}
