@@ -108,10 +108,10 @@ public class KafkaComponentsFactory {
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
 		KafkaAvroDeserializer keyDeserializer = new KafkaAvroDeserializer(schemaRegistry);
 		
-		Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");		
-		map.put("max.schemas.per.subject", "10000");
-		
-		keyDeserializer.configure(map, true);
+		//Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");		
+		//map.put("max.schemas.per.subject", "10000");		
+		//keyDeserializer.configure(map, true);
+		keyDeserializer.configure(Collections.singletonMap("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE)), true);
 		return ConsumerSettings.create(system, keyDeserializer,
 				new KafkaAvroDeserializer(schemaRegistry))
         		.withBootstrapServers(kafkaUrl)
@@ -135,9 +135,10 @@ public class KafkaComponentsFactory {
 	private ProducerSettings<Object, Object> createProducerSettings() {
 		KafkaAvroSerializer keySerializer = new KafkaAvroSerializer(schemaRegistry);
 		
-		Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");		
-		map.put("max.schemas.per.subject", "10000"); 
-		keySerializer.configure(map, true);
+		//Map<String,String> map = Collections.singletonMap("schema.registry.url", "http://fake-url");
+		//Map<String,String> map = Collections.singletonMap("max.schemas.per.subject", "http://fake-url");
+		//map.put("max.schemas.per.subject", "10000"); 
+		keySerializer.configure(Collections.singletonMap("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE)), true);
 		return ProducerSettings
                     .create(system, keySerializer, new KafkaAvroSerializer(schemaRegistry))
                     .withBootstrapServers(kafkaUrl);
