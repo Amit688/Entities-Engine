@@ -2,15 +2,11 @@ package org.z.entities.engine;
 
 import java.util.UUID;
 
-import org.apache.avro.generic.GenericRecord;
-import akka.stream.javadsl.SourceQueue;
-
 public class SourceDescriptor {
 	private UUID systemUUID;
 	private String sensorId;
 	private String reportsId;
 	private long dataOffset;
-	private SourceQueue<GenericRecord> sourceQueue;
 	
 	public SourceDescriptor(String sensorId, String reportsId, long dataOffset, UUID uuid) {
 		this.sensorId = sensorId;
@@ -18,12 +14,6 @@ public class SourceDescriptor {
 		this.dataOffset = dataOffset;
 		this.systemUUID = uuid;
 	}
-	
-	public void setSourceQueue(SourceQueue<GenericRecord> sourceQueue) {
-		this.sourceQueue = sourceQueue;
-	}
-
-
 
 	public String getSensorId() { return sensorId;}
 
@@ -32,8 +22,6 @@ public class SourceDescriptor {
 	public UUID getSystemUUID() { return systemUUID; }
 	
 	public long getDataOffset() { return dataOffset; }
-	
-	public SourceQueue<GenericRecord> getSourceQueue() { return sourceQueue; }
 
 	@Override
 	public int hashCode() {

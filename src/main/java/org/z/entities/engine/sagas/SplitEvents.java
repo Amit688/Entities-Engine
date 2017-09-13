@@ -1,7 +1,5 @@
 package org.z.entities.engine.sagas;
 
-import org.apache.avro.generic.GenericRecord;
-
 import java.util.UUID;
 
 public class SplitEvents {
@@ -19,24 +17,6 @@ public class SplitEvents {
         }
 
         public UUID getMergedEntity() {
-            return mergedEntity;
-        }
-    }
-
-    public static class MergedEntityStopped {
-        private UUID sagaId;
-        private GenericRecord mergedEntity;
-
-        public MergedEntityStopped(UUID sagaId, GenericRecord mergedEntity) {
-            this.sagaId = sagaId;
-            this.mergedEntity = mergedEntity;
-        }
-
-        public UUID getSagaId() {
-            return sagaId;
-        }
-
-        public GenericRecord getMergedEntity() {
             return mergedEntity;
         }
     }

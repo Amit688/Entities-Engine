@@ -7,7 +7,13 @@ import org.axonframework.eventhandling.EventBus;
 import org.axonframework.eventhandling.GenericEventMessage;
 import org.z.entities.engine.EntitiesEvent;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -45,7 +51,7 @@ public class SagasManager implements Consumer<EntitiesEvent> {
     }
 
     public void mergeEntities(GenericRecord data) {
-        System.out.println("Received merge event: " + data);
+//        System.out.println("Received merge event: " + data);
         List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
         List<UUID> uuids = new ArrayList<>(idsToMerge.size());
         for (Utf8 id : idsToMerge) {
@@ -77,6 +83,14 @@ public class SagasManager implements Consumer<EntitiesEvent> {
 
     @CommandHandler
     public void releaseEntities(SagasManagerCommands.ReleaseEntities command) {
+//        System.out.println("Sagas Manager recieved event to release entities");
+//        System.out.print("--->");
+//        command.getEntitiesToRelease().forEach(e -> System.out.print(e + ", "));
+//        System.out.println();
         occupiedEntities.removeAll(command.getEntitiesToRelease());
+    }
+
+    public Set<UUID> getOccupiedEntities() {
+        return occupiedEntities;
     }
 }

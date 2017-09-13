@@ -1,29 +1,13 @@
 package org.z.entities.engine;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-
-import akka.actor.ActorRef;
-import akka.kafka.*;
-
-import org.apache.avro.generic.GenericRecord;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
-
 import akka.Done;
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import akka.kafka.ConsumerSettings;
+import akka.kafka.KafkaConsumerActor;
+import akka.kafka.ProducerSettings;
+import akka.kafka.Subscription;
+import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
 import akka.kafka.javadsl.Producer;
 import akka.stream.javadsl.Sink;
@@ -31,6 +15,16 @@ import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
+
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class KafkaComponentsFactory {
 	private ActorSystem system;
@@ -60,7 +54,6 @@ public class KafkaComponentsFactory {
 	/**
 	 * Creates a source that filters its messages by a reportId
 	 *
-	 * @param system
 	 * @param topic
 	 * @param reportsId
 	 * @return
@@ -77,7 +70,6 @@ public class KafkaComponentsFactory {
 	/**
 	 * Creates a source from a source descriptor
 	 *
-	 * @param system
 	 * @param descriptor
 	 * @return
 	 */
@@ -146,5 +138,12 @@ public class KafkaComponentsFactory {
                     .create(system, keySerializer, new KafkaAvroSerializer(schemaRegistry))
                     .withBootstrapServers(kafkaUrl);
 	}
-	
+
+	public KafkaProducer<Object, Object> getKafkaProducer() {
+		if (sharingSinks) {
+			return kafkaProducer;
+		} else {
+			return createProducerSettings().createKafkaProducer();
+		}
+	}
 }
