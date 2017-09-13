@@ -90,7 +90,7 @@ public class EntityManagerForMailRoom implements Function<GenericRecord, Produce
 			GenericRecord sonAttributes = convertGeneralAttributes(data);
 			sons.put(sourceDescriptor, sonAttributes);
 			try {
-				ProducerRecord<Object, Object> guiUpdate = new ProducerRecord<>("update", createUpdate());
+				ProducerRecord<Object, Object> guiUpdate = new ProducerRecord<>("update", uuid.toString(), createUpdate());
 				System.out.print("GUI UPDATE:\n" + guiUpdate);
 				return guiUpdate;
 			} catch (IOException e) {
