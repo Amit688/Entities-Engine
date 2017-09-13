@@ -121,7 +121,8 @@ public class EntitiesSupervisor implements java.util.function.Consumer<EntitiesE
     		List<SourceDescriptor> sonsSources = killAndFlattenSonsAttributes(uuidsToMerge);
     		Source<ConsumerRecord<Object, Object>, NotUsed> mergedSource =
     				Source.fromGraph(GraphDSL.create(builder -> createMergedSourceGraph(builder, sonsSources)));
-    		createStream(mergedSource, sonsSources, UUID.randomUUID(), "MERGED",data.get("sourceName").toString());
+    		//createStream(mergedSource, sonsSources, UUID.randomUUID(), "MERGED",data.get("sourceName").toString());
+    		createStream(mergedSource, sonsSources, uuidsToMerge.get(0), "MERGED",data.get("sourceName").toString());
     	} else {
     		uuidsToMerge.removeAll(streams.keySet());
     		String debugString = uuidsToMerge.stream().map(UUID::toString).collect(Collectors.joining(", "));
