@@ -54,7 +54,7 @@ public class SagasManager implements Consumer<EntitiesEvent> {
 //        System.out.println("Received merge event: " + data);
         List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
         List<UUID> uuids = new ArrayList<>(idsToMerge.size());
-        for (Utf8 id : idsToMerge) {
+        for (Object id : idsToMerge) {
             uuids.add(UUID.fromString(id.toString()));
         }
         mergeEntities(uuids);
