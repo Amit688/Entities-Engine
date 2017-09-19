@@ -309,15 +309,15 @@ public class Main {
         printCurrentUuids(supervisor);
         printOccupiedUuids(sagasManager);
 
-        Simulator.writeSplit(system, materializer, schemaRegistry,
-                supervisor.getAllUuids().iterator().next());
-        System.out.println("Started split saga");
-        printOccupiedUuids(sagasManager);
-        Thread.sleep(2000);
-        printCurrentUuids(supervisor);
-        printOccupiedUuids(sagasManager);
-
-        Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
+//        Simulator.writeSplit(system, materializer, schemaRegistry,
+//                supervisor.getAllUuids().iterator().next());
+//        System.out.println("Started split saga");
+//        printOccupiedUuids(sagasManager);
+//        Thread.sleep(2000);
+//        printCurrentUuids(supervisor);
+//        printOccupiedUuids(sagasManager);
+//
+//        Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
 
 //		Thread.sleep(2000);
 //		Set<UUID> entities = supervisor.getAllUuids();

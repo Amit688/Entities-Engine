@@ -51,7 +51,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
             GenericRecord sonAttributes = convertGeneralAttributes(data);
             sons.put(sourceDescriptor, sonAttributes);
             try {
-                ProducerRecord<Object, Object> guiUpdate = new ProducerRecord<>("update", uuid.toString(), getCurrentState());
+                ProducerRecord<Object, Object> guiUpdate = generateGuiUpdate();
                 System.out.println("GUI UPDATE:\n" + guiUpdate);
                 return guiUpdate;
             } catch (RuntimeException e) {
@@ -111,6 +111,10 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
 
     private GenericData.EnumSymbol convertEnum(GenericData.EnumSymbol source, Schema targetSchema) {
         return new GenericData.EnumSymbol(targetSchema, source.toString());
+    }
+
+    public ProducerRecord<Object, Object> generateGuiUpdate() {
+        return new ProducerRecord<>("update", uuid.toString(), getCurrentState());
     }
 
     public GenericRecord getCurrentState() {

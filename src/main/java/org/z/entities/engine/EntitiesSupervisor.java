@@ -16,6 +16,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.z.entities.engine.streams.EntityProcessor;
+import org.z.entities.engine.streams.EntityProcessorStage;
 import org.z.entities.engine.streams.InterfaceSource;
 import org.z.entities.engine.streams.LastStatePublisher;
 import org.z.entities.engine.streams.StreamCompleter;
@@ -89,30 +90,37 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     public void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
         Map<SourceDescriptor, GenericRecord> sons = new HashMap<>(sourceDescriptors.size());
         sourceDescriptors.forEach(sourceDescriptor -> sons.put(sourceDescriptor, null));
-        createEntity(sourceDescriptors, sons, uuid, stateChange);
+        createEntity(sourceDescriptors, sons, uuid, stateChange, false);
     }
 
     public void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
                              UUID uuid, String stateChange) {
-//        System.out.println("EntitySupervisor creating new entity " + uuid);
+        createEntity(sourceDescriptors, sons, uuid, stateChange, true);
+    }
+
+    private void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
+                              UUID uuid, String stateChange, boolean sendInitialState) {
+        System.out.println("EntitySupervisor creating new entity " + uuid);
+        System.out.println("Send initial state " + sendInitialState);
         SourceDescriptor preferredSource = sourceDescriptors.iterator().next();
         EntityProcessor entityProcessor = new EntityProcessor(uuid, sons,
                 preferredSource, stateChange);
+        EntityProcessorStage entityProcessorStage = new EntityProcessorStage(entityProcessor, sendInitialState);
         StreamCompleter streamCompleter = new StreamCompleter(this, entityProcessor);
         SourceQueueWithComplete<GenericRecord> stopQueue =
-                createStream(sourceDescriptors, entityProcessor, streamCompleter);
+                createStream(sourceDescriptors, entityProcessorStage, streamCompleter);
         stopQueues.put(uuid, stopQueue);
     }
 
     private SourceQueueWithComplete<GenericRecord> createStream(
             Collection<SourceDescriptor> sourceDescriptors,
-            EntityProcessor entityProcessor,
+            EntityProcessorStage entityProcessorStage,
             StreamCompleter streamCompleter) {
         List<Source<GenericRecord, ?>> sources = createSources(sourceDescriptors);
         Source<GenericRecord, SourceQueueWithComplete<GenericRecord>> stopSource =
                 Source.queue(1, OverflowStrategy.backpressure());
         Flow<GenericRecord, GenericRecord, ?> completerFlow = Flow.fromGraph(streamCompleter);
-        Flow<GenericRecord, ProducerRecord<Object, Object>, ?> processorFlow = Flow.fromFunction(entityProcessor::apply);
+        Flow<GenericRecord, ProducerRecord<Object, Object>, ?> processorFlow = Flow.fromGraph(entityProcessorStage);
 
         return createAndRunGraph(sources, stopSource, completerFlow, processorFlow);
     }
