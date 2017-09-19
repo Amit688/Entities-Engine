@@ -11,7 +11,6 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.apache.avro.Schema;
-import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -19,7 +18,12 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -27,7 +31,8 @@ import java.util.concurrent.CompletionStage;
  */
 public class Simulator {
     public static void writeSomeData(ActorSystem system, Materializer materializer,
-                                      SchemaRegistryClient schemaRegistry, EntitiesSupervisor supervisor) throws IOException, RestClientException {
+                                      SchemaRegistryClient schemaRegistry, EntitiesSupervisor supervisor)
+            throws IOException, RestClientException {
         ProducerSettings<String, Object> producerSettings = ProducerSettings
                 .create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
                 .withBootstrapServers("192.168.0.51:9092");
@@ -99,7 +104,7 @@ public class Simulator {
         }
 
 
-        Set<UUID> uuidSet = supervisor.getStreams().keySet();
+        Set<UUID> uuidSet = supervisor.getAllUuids();
         UUID[] array = uuidSet.stream().toArray(UUID[]::new);
 
         Schema mergeSchema = getSchema(schemaRegistry, "mergeEvent");
@@ -138,7 +143,7 @@ public class Simulator {
 
         }
 
-        uuidSet = supervisor.getStreams().keySet();
+        uuidSet = supervisor.getAllUuids();
         array = uuidSet.stream().toArray(UUID[]::new);
 
         Schema splitSchema = getSchema(schemaRegistry, "splitEvent");
@@ -172,33 +177,10 @@ public class Simulator {
     }
 
     public static void writeSomeDataForMailRoom(ActorSystem system, Materializer materializer,
-                                                 SchemaRegistryClient schemaRegistry, EntitiesSupervisor supervisor) throws IOException, RestClientException {
-        ProducerSettings<String, Object> producerSettings = ProducerSettings
-                .create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-                .withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
-        Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
-
-        Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");
-        GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
-                .set("sourceName", "source1")
-                .set("externalSystemID", "id1")
-                .set("dataOffset", 444L)
-                .build();
-		/*	ProducerRecord<String, Object> producerRecord = new ProducerRecord<String, Object>("creation", creationRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		GenericRecord creationRecord2 = new GenericRecordBuilder(creationSchema)
-		.set("sourceName", "source2")
-		.set("externalSystemID", "id1")
-		.build();
-		producerRecord = new ProducerRecord<String, Object>("creation", creationRecord2);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-		 */
-        for(int i = 0 ; i < 2; i++) {
+                                                 SchemaRegistryClient schemaRegistry,
+                                                KafkaComponentsFactory componentsFactory)
+            throws IOException, RestClientException {
+        for(int i = 0 ; i < 1; i++) {
 
             Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
             Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
@@ -229,21 +211,18 @@ public class Simulator {
                     .set("externalSystemID", "id1_source1")
                     .build();
 
-            ProducerRecord<String, Object> producerRecord3 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-            Source.from(Arrays.asList(producerRecord3))
-                    .to(sink)
-                    .run(materializer);
+            ProducerRecord<Object, Object> producerRecord3 = new ProducerRecord("source1", dataRecord);
+            componentsFactory.getKafkaProducer().send(producerRecord3);
 
             try {
-                Thread.sleep(5000);
+                Thread.sleep(2000);
             } catch (Exception e) {
 
             }
 
         }
 
-        for(int i = 0 ; i < 2; i++) {
+        for(int i = 0 ; i < 1; i++) {
 
             Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
             Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
@@ -274,103 +253,16 @@ public class Simulator {
                     .set("externalSystemID", "id1_source_0")
                     .build();
 
-            ProducerRecord<String, Object> producerRecord3 = new ProducerRecord<String, Object>("source0", dataRecord);
-
-            Source.from(Arrays.asList(producerRecord3))
-                    .to(sink)
-                    .run(materializer);
+            ProducerRecord<Object, Object> producerRecord3 = new ProducerRecord("source0", dataRecord);
+            componentsFactory.getKafkaProducer().send(producerRecord3);
 
             try {
-                Thread.sleep(5000);
+                Thread.sleep(2000);
             } catch (Exception e) {
 
             }
 
         }
-
-		/*	producerRecord2 = new ProducerRecord<String, Object>("source2", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-
-		Set<UUID> uuidSet = supervisor.getStreams().keySet();
-		UUID[] array = uuidSet.stream().toArray(UUID[]::new);
-
-		Schema mergeSchema = getSchema(schemaRegistry, "mergeEvent");
-		GenericRecord mergeRecord = new GenericRecordBuilder(mergeSchema)
-		//.set("mergedEntitiesId", Arrays.asList("38400000-8cf0-11bd-b23f-0b96e4ef00e1",
-		//		"38400000-8cf0-11bd-b23f-0b96e4ef00e2"))
-		.set("mergedEntitiesId", Arrays.asList(array[0].toString(), array[1].toString()))
-		.build();
-		ProducerRecord<String, Object>   producerRecord = new ProducerRecord<String, Object>("merge", mergeRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-		uuidSet = supervisor.getStreams().keySet();
-		array = uuidSet.stream().toArray(UUID[]::new);
-
-		Schema splitSchema = getSchema(schemaRegistry, "splitEvent");
-		GenericRecord splitRecord = new GenericRecordBuilder(splitSchema)
-		//.set("splittedEntityID", "38400000-8cf0-11bd-b23f-0b96e4ef00e1")
-		.set("splittedEntityID", array[0].toString())
-		.build();
-		producerRecord = new ProducerRecord<String, Object>("split", splitRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(5000);
-		} catch (Exception e) {
-
-		}
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-		 */
     }
 
     public static void writeMerge(ActorSystem system, Materializer materializer,

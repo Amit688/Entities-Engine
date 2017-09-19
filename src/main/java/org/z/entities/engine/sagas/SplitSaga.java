@@ -6,7 +6,7 @@ import org.axonframework.eventhandling.saga.SagaEventHandler;
 import org.axonframework.eventhandling.saga.SagaLifecycle;
 import org.axonframework.eventhandling.saga.StartSaga;
 
-import javax.inject.Inject; 
+import javax.inject.Inject;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.UUID;
@@ -14,7 +14,6 @@ import java.util.UUID;
 public class SplitSaga {
     private UUID sagaId;
     private UUID mergedEntityId;
-    private GenericRecord mergedEntity;
 
     @Inject
     private transient CommandGateway commandGateway;
@@ -34,10 +33,10 @@ public class SplitSaga {
     }
 
     @SagaEventHandler(associationProperty = "sagaId")
-    public void validateSplit(MergeEvents.EntityStopped event){ //SplitEvents.MergedEntityStopped event) {
+    public void validateSplit(CommonEvents.EntityStopped event){ //SplitEvents.MergedEntityStopped event) {
         GenericRecord lastState = event.getLastState();
         if (validationService.validate(lastState)) {
-            System.out.println("split saga " + sagaId + " found valid, proceeding");
+//            System.out.println("split saga " + sagaId + " found valid, proceeding");
             commandGateway.send(new SplitCommands.SplitMergedEntity(lastState, sagaId));
         } else {
             commandGateway.send(new SplitCommands.RecoverMergedEntity(lastState, sagaId));
@@ -55,7 +54,7 @@ public class SplitSaga {
     }
 
     private void cleanup(String operationReport) {
-        System.out.println("split saga " + sagaId + " finished with report: " + operationReport);
+//        System.out.println("split saga " + sagaId + " finished with report: " + operationReport);
         commandGateway.send(new SagasManagerCommands.ReleaseEntities(new HashSet<>(Arrays.asList(mergedEntityId))));
         SagaLifecycle.end();
     }

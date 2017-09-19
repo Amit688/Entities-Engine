@@ -1,36 +1,11 @@
 package org.z.entities.engine.sagas;
 
-import org.apache.avro.generic.GenericRecord; 
+import org.apache.avro.generic.GenericRecord;
 
-import java.util.Collection; 
+import java.util.Collection;
 import java.util.UUID;
 
 public class MergeCommands {
-//    public static class CreateEntitiesAggregate {
-//        @TargetAggregateIdentifier
-//        private UUID aggregateId;
-//        private UUID sagaId;
-//        private Set<UUID> entities;
-//
-//        public CreateEntitiesAggregate(UUID aggregateId, UUID sagaId, Set<UUID> entities) {
-//            this.aggregateId = aggregateId;
-//            this.sagaId = sagaId;
-//            this.entities = entities;
-//        }
-//
-//        public UUID getAggregateId() {
-//            return aggregateId;
-//        }
-//
-//        public UUID getSagaId() {
-//            return sagaId;
-//        }
-//
-//        public Set<UUID> getEntities() {
-//            return entities;
-//        }
-//    }
-
     public static class StopEntities {
         private Collection<UUID> entitiesToStop;
         private UUID sagaId;
