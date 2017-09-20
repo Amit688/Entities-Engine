@@ -1,0 +1,7 @@
+{"type": "record",
+ "name": "SplitEvent", 
+ "namespace" : "org.z.entities.schema",
+ "doc": "This is a schema for split entities event",  
+ "fields":
+[{"name": "metadata", "type":"string"},
+{"name": "splittedEntityID", "type":"string"}]} 

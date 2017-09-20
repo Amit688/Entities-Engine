@@ -1,0 +1,16 @@
+{"type": "record", 
+ "name": "BasicEntityAttributes",
+ "namespace" : "org.z.entities.schema",
+ "doc": "This is a schema for basic entity attributes, this will represent basic entity in all life cycle",
+ "fields": [
+ {"name": "coordinate", 
+  "type":
+  {"type": "record",
+   "name": "Coordinate",
+   "doc": "Location attribute in grid format",
+   "fields": 
+	[ {"name": "lat","type": "double"},
+	  {"name": "long","type": "double"}]}},
+	  {"name": "isNotTracked","type": "boolean"},
+	  {"name": "entityOffset","type": "long"},
+	  {"name": "sourceName", "type": "string"}]}

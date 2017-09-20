@@ -5,10 +5,14 @@ import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.log4j.Logger;
+import org.z.entities.engine.utils.Utils;
+import org.z.entities.schema.DetectionEvent;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -37,6 +41,11 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 	private ConcurrentMap<String, BlockingQueue<GenericRecord>> reportsQueues;
 	private SourceQueueWithComplete<GenericRecord> creationQueue;
 
+    final static public Logger logger = Logger.getLogger(EntitiesSupervisor.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}
+	
 	public MailRoom(String sourceName, KafkaProducer<Object, Object> producer) {
         this.sourceName = sourceName;
         this.producer = producer;
@@ -50,14 +59,14 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 
 	@Override
 	public void accept(GenericRecord record) {
-//		System.out.println("MailRoom <"+sourceName+"> accept Message "+record);
+ 		logger.debug("MailRoom <"+sourceName+"> accept Message "+record);
 		String externalSystemId = record.get("externalSystemID").toString();
         BlockingQueue<GenericRecord> reportsQueue = reportsQueues.get(externalSystemId);
         if (reportsQueue != null) {
-//            System.out.println("Existing externalSystemID");
+            logger.debug("Existing externalSystemID");
             reportsQueues.get(externalSystemId).offer(record);
         } else {
-//            System.out.println("New externalSystemID");
+             logger.debug("New externalSystemID");
             BlockingQueue<GenericRecord> queue = new LinkedBlockingQueue<>();
             queue.add(record);
             reportsQueues.put(externalSystemId, queue);
@@ -80,21 +89,12 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 		Schema creationSchema;
 		if(testing) {
 			SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient(); 
-			Schema.Parser parser = new Schema.Parser();
-			schemaRegistry.register("detectionEvent",
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"detectionEvent\", "
-							+ "\"doc\": \"This is a schema for entity detection report event\", "
-							+ "\"fields\": ["
-							+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, "
-							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
-							+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
-							+ "]}"));
-			int id = schemaRegistry.getLatestSchemaMetadata("detectionEvent").getId();	
+			schemaRegistry.register("DetectionEvent", DetectionEvent.SCHEMA$);  
+			int id = schemaRegistry.getLatestSchemaMetadata("DetectionEvent").getId();	
 			creationSchema = schemaRegistry.getByID(id);
 		}
 		else {
-			creationSchema = getSchema("detectionEvent");
+			creationSchema = getSchema("DetectionEvent");
 		}
 
 		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)

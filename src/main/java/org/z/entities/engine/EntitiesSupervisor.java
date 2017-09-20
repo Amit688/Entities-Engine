@@ -10,16 +10,19 @@ import akka.stream.javadsl.MergePreferred;
 import akka.stream.javadsl.RunnableGraph;
 import akka.stream.javadsl.Source;
 import akka.stream.javadsl.SourceQueueWithComplete;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.log4j.Logger;
 import org.z.entities.engine.streams.EntityProcessor;
 import org.z.entities.engine.streams.EntityProcessorStage;
 import org.z.entities.engine.streams.InterfaceSource;
 import org.z.entities.engine.streams.LastStatePublisher;
 import org.z.entities.engine.streams.StreamCompleter;
+import org.z.entities.engine.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +42,11 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     private KafkaComponentsFactory componentsFactory;
     private Materializer materializer;
     private Map<UUID, SourceQueueWithComplete<GenericRecord>> stopQueues;
+    
+    final static public Logger logger = Logger.getLogger(EntitiesSupervisor.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}
 
     public EntitiesSupervisor(LastStatePublisher lastStatePublisher, Map<String, MailRoom> mailRooms,
                               KafkaComponentsFactory componentsFactory, Materializer materializer) {
@@ -61,23 +69,23 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
                 stopEntity(data);
                 break;
 			default:
-				System.out.println("received unknown event type: " + Objects.toString(entitiesEvent.getType()));
+				logger.debug("received unknown event type: " + Objects.toString(entitiesEvent.getType()));
 				break;
 	    	}
     	} catch (RuntimeException e) {
-    		System.out.println("failed to process event of type " + Objects.toString(entitiesEvent.getType()));
+    		logger.error("failed to process event of type " + Objects.toString(entitiesEvent.getType()));
     		e.printStackTrace();
     	}
     }
 
     private void createEntity(GenericRecord data) {
-//    	System.out.println("DATA IS: \n" + data.toString());
+     	logger.debug("DATA IS: \n" + data.toString());
 		SourceDescriptor sourceDescriptor = new SourceDescriptor(
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
 				(long)data.get("dataOffset"),
 				UUID.randomUUID());
-//		System.out.println("creating entity manager stream for source " + sourceDescriptor);
+		logger.debug("creating entity manager stream for source " + sourceDescriptor);
         createEntity(Arrays.asList(sourceDescriptor), sourceDescriptor.getSystemUUID(), "NONE");
     }
 
@@ -100,8 +108,8 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
 
     private void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
                               UUID uuid, String stateChange, boolean sendInitialState) {
-        System.out.println("EntitySupervisor creating new entity " + uuid);
-        System.out.println("Send initial state " + sendInitialState);
+    	logger.debug("EntitySupervisor creating new entity " + uuid);
+    	logger.debug("Send initial state " + sendInitialState);
         SourceDescriptor preferredSource = sourceDescriptors.iterator().next();
         EntityProcessor entityProcessor = new EntityProcessor(uuid, sons,
                 preferredSource, stateChange);
@@ -171,7 +179,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     public void stopEntity(UUID entityId, UUID sagaId) {
         SourceQueueWithComplete<GenericRecord> stopSource = stopQueues.get(entityId);
         if (stopSource != null) {
-//            System.out.println("EntitiesSupervisor stopping entity " + entityId);
+        	logger.debug("EntitiesSupervisor stopping entity " + entityId);
             stopSource.offer(createStopMessage(sagaId));
         } else {
             System.out.println("Tried to stop non-existent entity " + entityId);
@@ -191,7 +199,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     }
 
     public void notifyOfStreamCompletion(UUID entityId, GenericRecord lastState, UUID sagaId) {
-//        System.out.println("EntitiesSupervisor notified of stream completion " + entityId);
+        logger.debug("EntitiesSupervisor notified of stream completion " + entityId);
         stopQueues.remove(entityId);
         lastStatePublisher.publish(lastState, sagaId);
     }
