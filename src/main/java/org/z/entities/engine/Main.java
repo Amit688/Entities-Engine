@@ -126,12 +126,7 @@ public class Main {
 		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
 		if(testing) {
 			Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
-			
-			MergeActivityMultiMessages m = new MergeActivityMultiMessages();
-			m.setTesting(schemaRegistry, materializer, system);
-			m.run();
-			logger.debug(m.getOutput());
-			//simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
+			simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
 		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
