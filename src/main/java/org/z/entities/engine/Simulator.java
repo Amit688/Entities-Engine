@@ -179,7 +179,7 @@ public class Simulator {
 			KafkaComponentsFactory componentsFactory)
 					throws IOException, RestClientException {
 		
-		for(int i = 0 ; i < 1; i++) {
+		for(int i = 0 ; i < 3; i++) {
 
 			Schema basicAttributesSchema = getSchema(schemaRegistry, "BasicEntityAttributes");
 			Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
@@ -207,7 +207,7 @@ public class Simulator {
 			.set("pictureURL", "huh?")
 			.set("height", 6.1)
 			.set("nickname", "rerere")
-			.set("externalSystemID", "id1_source1")
+			.set("externalSystemID", "id1_source1"+i)
 			.build();
 
 			ProducerRecord<Object, Object> producerRecord3 = new ProducerRecord("source1", dataRecord);
@@ -221,7 +221,7 @@ public class Simulator {
 
 		}
 
-		for(int i = 0 ; i < 1; i++) {
+		for(int i = 0 ; i < 3; i++) {
 
 			Schema basicAttributesSchema = getSchema(schemaRegistry, "BasicEntityAttributes");
 			Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();

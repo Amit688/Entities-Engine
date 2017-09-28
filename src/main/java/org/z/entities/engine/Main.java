@@ -27,6 +27,7 @@ import org.axonframework.config.Configuration;
 import org.axonframework.config.DefaultConfigurer;
 import org.axonframework.config.SagaConfiguration;
 import org.axonframework.eventsourcing.eventstore.inmemory.InMemoryEventStorageEngine;
+import org.engine.process.performance.activity.merge.MergeActivityMultiMessages;
 import org.z.entities.engine.sagas.MergeSaga;
 import org.z.entities.engine.sagas.MergeValidationService;
 import org.z.entities.engine.sagas.SagaCommandsHandler;
@@ -44,7 +45,9 @@ import org.z.entities.schema.MergeEvent;
 import org.z.entities.schema.SplitEvent;
 import org.z.entities.schema.SystemEntity;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -56,7 +59,7 @@ import java.util.UUID;
  */
 public class Main {
 
-	public static boolean testing = true;
+	public static boolean testing = false;
 	final static public Logger logger = Logger.getLogger(Main.class);
 	static {
 		Utils.setDebugLevel(logger);
@@ -95,6 +98,7 @@ public class Main {
 
 		}
 		else {
+			System.setOut(new PrintStream(new FileOutputStream("/home/badhat/workspace/EnginePerformanceProcess/output.txt")));
 			system = ActorSystem.create();
 			schemaRegistry = new MockSchemaRegistryClient();
 			registerSchemas(schemaRegistry);
@@ -122,7 +126,12 @@ public class Main {
 		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
 		if(testing) {
 			Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
-			simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
+			
+			MergeActivityMultiMessages m = new MergeActivityMultiMessages();
+			m.setTesting(schemaRegistry, materializer, system);
+			m.run();
+			logger.debug(m.getOutput());
+			//simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
 		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {

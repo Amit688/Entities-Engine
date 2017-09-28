@@ -56,10 +56,10 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
             sons.put(sourceDescriptor, sonAttributes);
             try {
                 ProducerRecord<Object, Object> guiUpdate = generateGuiUpdate();
-                System.out.println("GUI UPDATE:\n" + guiUpdate);
+                logger.debug("GUI UPDATE:\n" + guiUpdate);
                 return guiUpdate;
             } catch (RuntimeException e) {
-                System.out.println("failed to generate update");
+            	logger.debug("failed to generate update");
                 e.printStackTrace();
                 throw new RuntimeException(e);
             }
@@ -124,8 +124,8 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     public GenericRecord getCurrentState() {
         List<GenericRecord> sonsRecords = new ArrayList<>();
         for (SourceDescriptor sonKey : sons.keySet()) {
-            System.out.println(sonKey);
-            System.out.println(sons.get(sonKey));
+            logger.debug(sonKey);
+            logger.debug(sons.get(sonKey));
             sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
         }
         GenericRecord family = new GenericRecordBuilder(EntityFamily.SCHEMA$)
