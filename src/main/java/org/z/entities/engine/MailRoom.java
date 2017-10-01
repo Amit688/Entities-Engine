@@ -41,7 +41,7 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 	private ConcurrentMap<String, BlockingQueue<GenericRecord>> reportsQueues;
 	private SourceQueueWithComplete<GenericRecord> creationQueue;
 
-    final static public Logger logger = Logger.getLogger(EntitiesSupervisor.class);
+    final static public Logger logger = Logger.getLogger(MailRoom.class);
 	static {
 		Utils.setDebugLevel(logger);
 	}
@@ -66,7 +66,7 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
             logger.debug("Existing externalSystemID");
             reportsQueues.get(externalSystemId).offer(record);
         } else {
-             logger.debug("New externalSystemID");
+            logger.debug("New externalSystemID");
             BlockingQueue<GenericRecord> queue = new LinkedBlockingQueue<>();
             queue.add(record);
             reportsQueues.put(externalSystemId, queue);
@@ -111,6 +111,7 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 		String schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_ADDRESS");
 		String schemaRegistryIdentity = System.getenv("SCHEMA_REGISTRY_IDENTITY");		
 		SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryUrl, Integer.parseInt(schemaRegistryIdentity));
+		name = "org.z.entities.schema."+name;
 		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
 		return schemaRegistry.getByID(id);
 	}
