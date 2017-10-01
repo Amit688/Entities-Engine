@@ -26,8 +26,7 @@ import org.axonframework.commandhandling.AsynchronousCommandBus;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.DefaultConfigurer;
 import org.axonframework.config.SagaConfiguration;
-import org.axonframework.eventsourcing.eventstore.inmemory.InMemoryEventStorageEngine;
-import org.engine.process.performance.activity.merge.MergeActivityMultiMessages;
+import org.axonframework.eventsourcing.eventstore.inmemory.InMemoryEventStorageEngine; 
 import org.z.entities.engine.sagas.MergeSaga;
 import org.z.entities.engine.sagas.MergeValidationService;
 import org.z.entities.engine.sagas.SagaCommandsHandler;
@@ -126,7 +125,12 @@ public class Main {
 		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
 		if(testing) {
 			Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
-			simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
+			
+			MergeActivityMultiMessages m = new MergeActivityMultiMessages();
+			m.setTesting(schemaRegistry, materializer, system);
+			m.run();
+			logger.debug(m.getOutput());
+			//simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
 		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
