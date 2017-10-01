@@ -1,12 +1,15 @@
 package org.z.entities.engine.sagas;
 
 import org.apache.avro.generic.GenericRecord;
+import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.eventhandling.saga.SagaEventHandler;
 import org.axonframework.eventhandling.saga.SagaLifecycle;
 import org.axonframework.eventhandling.saga.StartSaga;
+import org.z.entities.engine.utils.Utils;
 
 import javax.inject.Inject;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.UUID;
@@ -14,6 +17,10 @@ import java.util.UUID;
 public class SplitSaga {
     private UUID sagaId;
     private UUID mergedEntityId;
+	final static public Logger logger = Logger.getLogger(SplitSaga.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}   
 
     @Inject
     private transient CommandGateway commandGateway;
@@ -33,10 +40,10 @@ public class SplitSaga {
     }
 
     @SagaEventHandler(associationProperty = "sagaId")
-    public void validateSplit(CommonEvents.EntityStopped event){ //SplitEvents.MergedEntityStopped event) {
+    public void validateSplit(CommonEvents.EntityStopped event){
         GenericRecord lastState = event.getLastState();
         if (validationService.validate(lastState)) {
-//            System.out.println("split saga " + sagaId + " found valid, proceeding");
+             logger.debug("split saga " + sagaId + " found valid, proceeding");
             commandGateway.send(new SplitCommands.SplitMergedEntity(lastState, sagaId));
         } else {
             commandGateway.send(new SplitCommands.RecoverMergedEntity(lastState, sagaId));
@@ -54,7 +61,7 @@ public class SplitSaga {
     }
 
     private void cleanup(String operationReport) {
-//        System.out.println("split saga " + sagaId + " finished with report: " + operationReport);
+    	logger.debug("split saga " + sagaId + " finished with report: " + operationReport);
         commandGateway.send(new SagasManagerCommands.ReleaseEntities(new HashSet<>(Arrays.asList(mergedEntityId))));
         SagaLifecycle.end();
     }

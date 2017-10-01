@@ -1,14 +1,9 @@
 package org.z.entities.engine;
 
-import akka.stream.javadsl.SourceQueueWithComplete;
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import akka.stream.javadsl.SourceQueueWithComplete; 
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.generic.GenericRecordBuilder;
+import org.apache.avro.generic.GenericRecord; 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.log4j.Logger;
 import org.z.entities.engine.utils.Utils;
@@ -34,8 +29,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  *
  */
 public class MailRoom implements java.util.function.Consumer<GenericRecord>,Closeable {
-    private static boolean testing = Main.testing;
-
+	
     private String sourceName;
     private KafkaProducer<Object, Object> producer;
 	private ConcurrentMap<String, BlockingQueue<GenericRecord>> reportsQueues;
@@ -92,16 +86,6 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 		.build();
 
 		return detectionEvent;
-	}
-
-	private Schema getSchema(String name) throws IOException, RestClientException {
-
-		String schemaRegistryUrl = System.getenv("SCHEMA_REGISTRY_ADDRESS");
-		String schemaRegistryIdentity = System.getenv("SCHEMA_REGISTRY_IDENTITY");		
-		SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryUrl, Integer.parseInt(schemaRegistryIdentity));
-		name = "org.z.entities.schema."+name;
-		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
-		return schemaRegistry.getByID(id);
 	}
 
     public BlockingQueue<GenericRecord> getReportsQueue(String externalSystemId) {

@@ -2,10 +2,13 @@ package org.z.entities.engine.sagas;
 
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
+import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventhandling.EventBus;
 import org.axonframework.eventhandling.GenericEventMessage;
 import org.z.entities.engine.EntitiesEvent;
+import org.z.entities.engine.Main;
+import org.z.entities.engine.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,6 +23,10 @@ import java.util.stream.Collectors;
 public class SagasManager implements Consumer<EntitiesEvent> {
     private Set<UUID> occupiedEntities;
     private EventBus eventBus;
+	final static public Logger logger = Logger.getLogger(SagasManager.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}   
 
     public SagasManager() {
         this.occupiedEntities = new HashSet<>();
@@ -51,7 +58,7 @@ public class SagasManager implements Consumer<EntitiesEvent> {
     }
 
     public void mergeEntities(GenericRecord data) {
-//        System.out.println("Received merge event: " + data);
+    	logger.debug("Saga Manager received merge event: " + data);
         List<Utf8> idsToMerge = (List<Utf8>) data.get("mergedEntitiesId");
         List<UUID> uuids = new ArrayList<>(idsToMerge.size());
         for (Object id : idsToMerge) {
@@ -74,6 +81,7 @@ public class SagasManager implements Consumer<EntitiesEvent> {
     }
 
     public UUID splitEntity(GenericRecord data) {
+    	logger.debug("Saga Manager received split event: " + data);
         UUID uuid = UUID.fromString(data.get("splittedEntityID").toString());
         occupiedEntities.add(uuid);
         UUID sagaId = UUID.randomUUID();
@@ -83,10 +91,9 @@ public class SagasManager implements Consumer<EntitiesEvent> {
 
     @CommandHandler
     public void releaseEntities(SagasManagerCommands.ReleaseEntities command) {
-//        System.out.println("Sagas Manager recieved event to release entities");
-//        System.out.print("--->");
-//        command.getEntitiesToRelease().forEach(e -> System.out.print(e + ", "));
-//        System.out.println();
+    	logger.debug("Sagas Manager recieved event to release entities");
+    	logger.debug("--->");
+        command.getEntitiesToRelease().forEach(e -> logger.debug(e + ", ")); 
         occupiedEntities.removeAll(command.getEntitiesToRelease());
     }
 
