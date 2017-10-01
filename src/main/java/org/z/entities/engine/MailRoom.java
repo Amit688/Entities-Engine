@@ -85,25 +85,13 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
     }
 
 	private GenericRecord getGenericRecordForCreation(String externalSystemID) throws IOException, RestClientException {
-
-		Schema creationSchema;
-		if(testing) {
-			SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient(); 
-			schemaRegistry.register("DetectionEvent", DetectionEvent.SCHEMA$);  
-			int id = schemaRegistry.getLatestSchemaMetadata("DetectionEvent").getId();	
-			creationSchema = schemaRegistry.getByID(id);
-		}
-		else {
-			creationSchema = getSchema("DetectionEvent");
-		}
-
-		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
-		.set("sourceName", sourceName)
-		.set("externalSystemID",externalSystemID)
-		.set("dataOffset",3333L)
+		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
+		.setSourceName(sourceName)
+		.setExternalSystemID(externalSystemID)
+		.setDataOffset(3333L)
 		.build();
 
-		return creationRecord;
+		return detectionEvent;
 	}
 
 	private Schema getSchema(String name) throws IOException, RestClientException {
