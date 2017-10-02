@@ -7,7 +7,10 @@ import akka.stream.stage.AbstractOutHandler;
 import akka.stream.stage.AsyncCallback;
 import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
+
 import org.apache.avro.generic.GenericRecord;
+import org.apache.log4j.Logger; 
+import org.z.entities.engine.utils.Utils;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -20,10 +23,13 @@ public class InterfaceSource extends GraphStage<SourceShape<GenericRecord>> {
 
     public final Outlet<GenericRecord> out = Outlet.create("InterfaceSource.out");
     private final SourceShape<GenericRecord> shape = SourceShape.of(out);
-
     private BlockingQueue<GenericRecord> queue;
     private String identifier;
-
+	final static public Logger logger = Logger.getLogger(InterfaceSource.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}
+    
     public InterfaceSource(BlockingQueue<GenericRecord> queue, String identifier) {
         this.queue = queue;
         this.identifier = identifier;
@@ -46,10 +52,10 @@ public class InterfaceSource extends GraphStage<SourceShape<GenericRecord>> {
                     public void onPull() throws Exception {
                         GenericRecord record = queue.poll();
                         if (record == null) {
-//                            System.out.println("InterfaceSource " + identifier + " no records in queue, invoking callback");
+                        	logger.debug("InterfaceSource " + identifier + " no records in queue, invoking callback");
                             taskFuture = executor.submit(() -> invokeCallbackWhenReady()); // necessary, otherwise blocks upstream
                         } else {
-//                            System.out.println("InterfaceSource " + identifier + " found record during pull, pushing");
+                        	logger.debug("InterfaceSource " + identifier + " found record during pull, pushing");
                             push(out, record);
                         }
                     }
@@ -66,9 +72,9 @@ public class InterfaceSource extends GraphStage<SourceShape<GenericRecord>> {
             @Override
             public void preStart() {
                 callBack = createAsyncCallback(record -> {
-//                    System.out.println("InterfaceSource " + identifier + " trying to push during callback");
+                	logger.debug("InterfaceSource " + identifier + " trying to push during callback");
                     push(out, record);
-//                    System.out.println("InterfaceSource " + identifier + " pushed during callback");
+                    logger.debug("InterfaceSource " + identifier + " pushed during callback");
                 });
             }
 
@@ -81,7 +87,7 @@ public class InterfaceSource extends GraphStage<SourceShape<GenericRecord>> {
                         return; // Probably interrupted by onDownstreamFinish().
                     }
                 }
-//                System.out.println("InterfaceSource " + identifier + " found record during task, invoking callback");
+                logger.debug("InterfaceSource " + identifier + " found record during task, invoking callback");
                 callBack.invoke(record);
             }
         };

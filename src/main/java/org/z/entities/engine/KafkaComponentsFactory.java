@@ -91,8 +91,7 @@ public class KafkaComponentsFactory {
 		if (sharingSources) {
 			return Consumer.plainExternalSource(consumerActor,
 					Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
-		} else {
-			System.out.println("Topic "+topic+" offset "+offset);
+		} else { 
 			return Consumer.plainSource(createConsumerSettings(),
 					(Subscription) Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
 		}

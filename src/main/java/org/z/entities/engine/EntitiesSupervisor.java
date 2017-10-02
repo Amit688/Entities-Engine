@@ -182,7 +182,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
         	logger.debug("EntitiesSupervisor stopping entity " + entityId);
             stopSource.offer(createStopMessage(sagaId));
         } else {
-            System.out.println("Tried to stop non-existent entity " + entityId);
+        	logger.error("Tried to stop non-existent entity " + entityId);
         }
     }
 

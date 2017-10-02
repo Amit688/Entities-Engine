@@ -73,6 +73,7 @@ public class Main {
 		logger.debug("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
 		logger.debug("CONF_IND::::::::" + System.getenv("CONF_IND"));
 		logger.debug("INTERFACES_NAME::::::::" + System.getenv("INTERFACES_NAME"));
+		logger.debug("DEBUG_LEVEL::::::::" + System.getenv("DEBUG_LEVEL"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
 		final ActorSystem system; 

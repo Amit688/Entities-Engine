@@ -48,11 +48,11 @@ public class SagasManager implements Consumer<EntitiesEvent> {
                     splitEntity(data);
                     break;
                 default:
-                    System.out.println("received unknown event type: " + Objects.toString(event.getType()));
+                    logger.error("received unknown event type: " + Objects.toString(event.getType()));
                     break;
             }
         } catch (RuntimeException e) {
-            System.out.println("failed to process event of type " + Objects.toString(event.getType()));
+        	logger.error("failed to process event of type " + Objects.toString(event.getType()));
             e.printStackTrace();
         }
     }

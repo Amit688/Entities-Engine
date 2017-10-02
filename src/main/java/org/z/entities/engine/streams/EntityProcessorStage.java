@@ -8,21 +8,27 @@ import akka.stream.stage.AbstractInHandler;
 import akka.stream.stage.AbstractOutHandler;
 import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
+
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.log4j.Logger; 
+import org.z.entities.engine.utils.Utils;
 
 public class EntityProcessorStage extends GraphStage<FlowShape<GenericRecord, ProducerRecord<Object, Object>>> {
 
     public final Inlet<GenericRecord> in = Inlet.create("Processor.in");
     public final Outlet<ProducerRecord<Object, Object>> out = Outlet.create("Processor.out");
-
     private EntityProcessor entityProcessor;
     private boolean sendInitialState;
+	final static public Logger logger = Logger.getLogger(EntityProcessorStage.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}   
 
     public EntityProcessorStage(EntityProcessor entityProcessor, boolean sendInitialState) {
         this.entityProcessor = entityProcessor;
         this.sendInitialState = sendInitialState;
-        System.out.println(sendInitialState);
+        logger.debug(sendInitialState);
     }
 
     private final FlowShape<GenericRecord, ProducerRecord<Object, Object>> shape = FlowShape.of(in, out);
@@ -48,11 +54,11 @@ public class EntityProcessorStage extends GraphStage<FlowShape<GenericRecord, Pr
                     @Override
                     public void onPull() throws Exception {
                         if (sendInitialState && !alreadySentInitialState) {
-//                            System.out.println("sending initial state");
+                        	logger.debug("sending initial state");
                             push(out, entityProcessor.generateGuiUpdate());
                             alreadySentInitialState = true;
                         } else {
-//                            System.out.println("pulling new state");
+                        	logger.debug("pulling new state");
                             pull(in);
                         }
                     }
