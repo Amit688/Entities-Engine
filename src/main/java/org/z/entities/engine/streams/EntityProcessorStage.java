@@ -54,8 +54,9 @@ public class EntityProcessorStage extends GraphStage<FlowShape<GenericRecord, Pr
                     @Override
                     public void onPull() throws Exception {
                         if (sendInitialState && !alreadySentInitialState) {
-                        	logger.debug("sending initial state");
-                            push(out, entityProcessor.generateGuiUpdate());
+                        	ProducerRecord<Object, Object> producerRecord = entityProcessor.generateGuiUpdate();
+                        	logger.debug("sending initial state - " + producerRecord);
+                            push(out, producerRecord);
                             alreadySentInitialState = true;
                         } else {
                         	logger.debug("pulling new state");

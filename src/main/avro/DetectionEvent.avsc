@@ -4,6 +4,11 @@
   "name": "DetectionEvent",
   "doc": "This is a schema for entity detection report event",
   "fields": [
+    {"name": "metadata", 
+  	 "type":"string",
+  	 "doc" : "metadata",
+  	 "default":""
+  	 },
 	{
   	"name": "sourceName",
   	"type": "string",

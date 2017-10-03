@@ -28,7 +28,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     private String stateChange;
     private String initialMetadata;
 
-    private static final String defaultMetadata = (String) EntityFamily.SCHEMA$.getField("initialMetadata").defaultVal();
+    private static final String defaultMetadata = (String) EntityFamily.SCHEMA$.getField("metadata").defaultVal();
 
     public final static Logger logger = Logger.getLogger(EntityProcessor.class);
 	static {
@@ -98,7 +98,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 .set("basicAttributes", convertBasicAttributes((GenericRecord) data.get("basicAttributes")))
                 .set("category", category)
                 .set("nationality", nationality);
-        copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "initialMetadata"));
+        copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "metadata"));
         return builder.build();
     }
 
@@ -144,7 +144,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 .set("entityAttributes", sons.get(preferredSource))
                 .set("sons", sonsRecords)
                 .set("stateChanges", stateChange)
-                .set("initialMetadata", metadataForThisUpdate)
+                .set("metadata", metadataForThisUpdate)
                 .build();
 
         if (!stateChange.equals("NONE")) {
