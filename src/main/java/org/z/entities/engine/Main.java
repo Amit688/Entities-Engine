@@ -98,7 +98,7 @@ public class Main {
 
 		}
 		else {
-//			System.setOut(new PrintStream(new FileOutputStream("/home/badhat/workspace/EnginePerformanceProcess/output.txt")));
+			System.setOut(new PrintStream(new FileOutputStream("/home/badhat/workspace/EnginePerformanceProcess/output.txt")));
 			system = ActorSystem.create();
 			schemaRegistry = new MockSchemaRegistryClient();
 			registerSchemas(schemaRegistry);

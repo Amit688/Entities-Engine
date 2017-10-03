@@ -26,9 +26,11 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     private Map<SourceDescriptor, GenericRecord> sons;
     private SourceDescriptor preferredSource;
     private String stateChange;
-    private String metadata;
-    
-	final static public Logger logger = Logger.getLogger(EntityProcessor.class);
+    private String initialMetadata;
+
+    private static final String defaultMetadata = (String) EntityFamily.SCHEMA$.getField("initialMetadata").defaultVal();
+
+    public final static Logger logger = Logger.getLogger(EntityProcessor.class);
 	static {
 		Utils.setDebugLevel(logger);
 	}
@@ -39,7 +41,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
         this.sons = sons;
         this.preferredSource = preferredSource;
         this.stateChange = stateChange;
-        this.metadata = metadata;
+        this.initialMetadata = metadata;
     }
 
     public UUID getUuid() {
@@ -96,7 +98,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 .set("basicAttributes", convertBasicAttributes((GenericRecord) data.get("basicAttributes")))
                 .set("category", category)
                 .set("nationality", nationality);
-        copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID"));
+        copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "initialMetadata"));
         return builder.build();
     }
 
@@ -131,20 +133,25 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
             logger.debug(sons.get(sonKey));
             sonsRecords.add(createSingleEntityUpdate(sons.get(sonKey), sonKey.getSystemUUID()));
         }
+
+        String metadataForThisUpdate = initialMetadata;
+        if (metadataForThisUpdate.equals(defaultMetadata)) {
+            metadataForThisUpdate = (String) sons.get(preferredSource).get("metadata");
+        }
+
         GenericRecord family = new GenericRecordBuilder(EntityFamily.SCHEMA$)
                 .set("entityID", uuid.toString())
                 .set("entityAttributes", sons.get(preferredSource))
                 .set("sons", sonsRecords)
                 .set("stateChanges", stateChange)
-                .set("metadata", metadata)
+                .set("initialMetadata", metadataForThisUpdate)
                 .build();
 
         if (!stateChange.equals("NONE")) {
             stateChange = "NONE";
         }
-        String defaultMetadata = (String) EntityFamily.SCHEMA$.getField("metadata").defaultVal();
-        if (!metadata.equals(defaultMetadata)) {
-            metadata = defaultMetadata;
+        if (!initialMetadata.equals(defaultMetadata)) {
+            initialMetadata = defaultMetadata;
         }
         return family;
     }
