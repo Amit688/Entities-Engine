@@ -3,7 +3,8 @@
  "namespace" : "org.z.entities.schema",
  "doc": "This is a schema for general entity before acquiring by the system,",
  "fields": 
-         [{"name": "basicAttributes","type": "BasicEntityAttributes"},
+         [{"name": "metadata", "type":"string"},
+          {"name": "basicAttributes","type": "BasicEntityAttributes"},
 		  {"name": "speed","type": "double","doc" : "This is the magnitude of the entity's velcity vector."},
 		  {"name": "elevation","type": "double"},
 		  {"name": "course","type": "double"},
