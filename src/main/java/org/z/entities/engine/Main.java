@@ -58,7 +58,7 @@ import java.util.UUID;
  */
 public class Main {
 
-	public static boolean testing = true;
+	public static boolean testing = false;
 	final static public Logger logger = Logger.getLogger(Main.class);
 	static {
 		Utils.setDebugLevel(logger);
