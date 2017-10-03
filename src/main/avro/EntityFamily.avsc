@@ -3,7 +3,7 @@
  "namespace" : "org.z.entities.schema",
  "doc": "This is a schema of processed entity with full attributes.",
  "fields": 
-    [ {"name": "metadata", "type":"string"},
+    [ {"name": "metadata", "type":"string", "default":""},
       {"name": "entityID", "type": "string"},
       {"name": "stateChanges", "type": "string"},
 	  {"name": "entityAttributes", "type": "GeneralEntityAttributes"},

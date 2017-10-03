@@ -86,7 +86,8 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
 				(long)data.get("dataOffset"),
 				UUID.randomUUID());
 		logger.debug("creating entity manager stream for source " + sourceDescriptor);
-        createEntity(Arrays.asList(sourceDescriptor), sourceDescriptor.getSystemUUID(), "NONE");
+		String metadata = (String) data.get("metadata");
+        createEntity(Arrays.asList(sourceDescriptor), sourceDescriptor.getSystemUUID(), "NONE", metadata);
     }
 
     /**
@@ -95,24 +96,25 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
      * @param uuid
      * @param stateChange
      */
-    public void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
+    public void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange,
+                             String metadata) {
         Map<SourceDescriptor, GenericRecord> sons = new HashMap<>(sourceDescriptors.size());
         sourceDescriptors.forEach(sourceDescriptor -> sons.put(sourceDescriptor, null));
-        createEntity(sourceDescriptors, sons, uuid, stateChange, false);
+        createEntity(sourceDescriptors, sons, uuid, stateChange, metadata, false);
     }
 
     public void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
-                             UUID uuid, String stateChange) {
-        createEntity(sourceDescriptors, sons, uuid, stateChange, true);
+                             UUID uuid, String stateChange, String metadata) {
+        createEntity(sourceDescriptors, sons, uuid, stateChange, metadata, true);
     }
 
     private void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
-                              UUID uuid, String stateChange, boolean sendInitialState) {
+                              UUID uuid, String stateChange, String metadata, boolean sendInitialState) {
     	logger.debug("EntitySupervisor creating new entity " + uuid);
     	logger.debug("Send initial state " + sendInitialState);
         SourceDescriptor preferredSource = sourceDescriptors.iterator().next();
         EntityProcessor entityProcessor = new EntityProcessor(uuid, sons,
-                preferredSource, stateChange);
+                preferredSource, stateChange, metadata);
         EntityProcessorStage entityProcessorStage = new EntityProcessorStage(entityProcessor, sendInitialState);
         StreamCompleter streamCompleter = new StreamCompleter(this, entityProcessor);
         SourceQueueWithComplete<GenericRecord> stopQueue =

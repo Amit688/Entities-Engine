@@ -26,17 +26,20 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     private Map<SourceDescriptor, GenericRecord> sons;
     private SourceDescriptor preferredSource;
     private String stateChange;
+    private String metadata;
     
 	final static public Logger logger = Logger.getLogger(EntityProcessor.class);
 	static {
 		Utils.setDebugLevel(logger);
 	}
 
-    public EntityProcessor(UUID uuid, Map<SourceDescriptor, GenericRecord> sons, SourceDescriptor preferredSource, String stateChange) {
+    public EntityProcessor(UUID uuid, Map<SourceDescriptor, GenericRecord> sons, SourceDescriptor preferredSource, String stateChange,
+                           String metadata) {
         this.uuid = uuid;
         this.sons = sons;
         this.preferredSource = preferredSource;
         this.stateChange = stateChange;
+        this.metadata = metadata;
     }
 
     public UUID getUuid() {
@@ -133,9 +136,15 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 .set("entityAttributes", sons.get(preferredSource))
                 .set("sons", sonsRecords)
                 .set("stateChanges", stateChange)
+                .set("metadata", metadata)
                 .build();
+
         if (!stateChange.equals("NONE")) {
             stateChange = "NONE";
+        }
+        String defaultMetadata = (String) EntityFamily.SCHEMA$.getField("metadata").defaultVal();
+        if (!metadata.equals(defaultMetadata)) {
+            metadata = defaultMetadata;
         }
         return family;
     }

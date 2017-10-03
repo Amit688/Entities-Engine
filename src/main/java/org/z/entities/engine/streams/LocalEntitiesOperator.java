@@ -16,14 +16,14 @@ public class LocalEntitiesOperator implements EntitiesOperator {
     }
 
     @Override
-    public void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange) {
-        entitiesSupervisor.createEntity(sourceDescriptors, uuid, stateChange);
+    public void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange, String metadata) {
+        entitiesSupervisor.createEntity(sourceDescriptors, uuid, stateChange, metadata);
     }
 
     @Override
     public void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
-                             UUID uuid, String stateChange) {
-        entitiesSupervisor.createEntity(sourceDescriptors, sons, uuid, stateChange);
+                             UUID uuid, String stateChange, String metadata) {
+        entitiesSupervisor.createEntity(sourceDescriptors, sons, uuid, stateChange, metadata);
     }
 
     @Override

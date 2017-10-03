@@ -17,6 +17,7 @@ import java.util.UUID;
 public class SplitSaga {
     private UUID sagaId;
     private UUID mergedEntityId;
+    private String metadata;
 	final static public Logger logger = Logger.getLogger(SplitSaga.class);
 	static {
 		Utils.setDebugLevel(logger);
@@ -36,6 +37,7 @@ public class SplitSaga {
     public void stopEntity(SplitEvents.SplitRequested event) {
         sagaId = event.getSagaId();
         mergedEntityId = event.getMergedEntity();
+        metadata = event.getMetadata();
         commandGateway.send(new SplitCommands.StopMergedEntity(mergedEntityId, sagaId));
     }
 
@@ -44,7 +46,7 @@ public class SplitSaga {
         GenericRecord lastState = event.getLastState();
         if (validationService.validate(lastState)) {
              logger.debug("split saga " + sagaId + " found valid, proceeding");
-            commandGateway.send(new SplitCommands.SplitMergedEntity(lastState, sagaId));
+            commandGateway.send(new SplitCommands.SplitMergedEntity(lastState, sagaId, metadata));
         } else {
             commandGateway.send(new SplitCommands.RecoverMergedEntity(lastState, sagaId));
         }

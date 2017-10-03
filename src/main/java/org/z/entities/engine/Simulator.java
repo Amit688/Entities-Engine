@@ -16,6 +16,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.z.entities.schema.MergeEvent;
+import org.z.entities.schema.SplitEvent;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -271,10 +273,11 @@ public class Simulator {
 				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
 		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
 
-		try {
+//		try {
 			List<String> asStrings = new ArrayList<>(entitiesToMerge.size());
 			entitiesToMerge.forEach(uuid -> asStrings.add(uuid.toString()));
-			Schema schema = getSchema(schemaRegistry, "mergeEvent");
+//			Schema schema = getSchema(schemaRegistry, "mergeEvent");
+			Schema schema = MergeEvent.SCHEMA$;
 			GenericRecord mergeMessage = new GenericRecordBuilder(schema)
 			.set("mergedEntitiesId", asStrings)
 			.build();
@@ -285,9 +288,9 @@ public class Simulator {
 			Source.from(Arrays.asList(producerRecord))
 			.to(sink)
 			.run(materializer);
-		} catch (IOException | RestClientException e) {
-			throw new RuntimeException(e);
-		}
+//		} catch (IOException | RestClientException e) {
+//			throw new RuntimeException(e);
+//		}
 
 	}
 
@@ -298,8 +301,9 @@ public class Simulator {
 				.withBootstrapServers(System.getenv("KAFKA_ADDRESS"));
 		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
 
-		try {
-			Schema schema = getSchema(schemaRegistry, "SplitEvent");
+//		try {
+//			Schema schema = getSchema(schemaRegistry, "SplitEvent");
+			Schema schema = SplitEvent.SCHEMA$;
 			GenericRecord splitMessage = new GenericRecordBuilder(schema)
 			.set("splittedEntityID", entityToSplit.toString())
 			.build();
@@ -310,9 +314,9 @@ public class Simulator {
 			Source.from(Arrays.asList(producerRecord))
 			.to(sink)
 			.run(materializer);
-		} catch (IOException | RestClientException e) {
-			throw new RuntimeException(e);
-		}
+//		} catch (IOException | RestClientException e) {
+//			throw new RuntimeException(e);
+//		}
 	}
 
 	private static Schema getSchema(SchemaRegistryClient schemaRegistry, String name) throws IOException, RestClientException {

@@ -6,10 +6,12 @@ public class SplitEvents {
     public static class SplitRequested {
         private UUID sagaId;
         private UUID mergedEntity;
+        private String metadata;
 
-        public SplitRequested(UUID sagaId, UUID mergedEntity) {
+        public SplitRequested(UUID sagaId, UUID mergedEntity, String metadata) {
             this.sagaId = sagaId;
             this.mergedEntity = mergedEntity;
+            this.metadata = metadata;
         }
 
         public UUID getSagaId() {
@@ -18,6 +20,10 @@ public class SplitEvents {
 
         public UUID getMergedEntity() {
             return mergedEntity;
+        }
+
+        public String getMetadata() {
+            return metadata;
         }
     }
 

@@ -7,10 +7,12 @@ public class MergeEvents {
     public static class MergeRequested {
         private UUID sagaId;
         private Collection<UUID> entitiesToMerge;
+        private String metadata;
 
-        public MergeRequested(UUID sagaId, Collection<UUID> entitiesToMerge) {
+        public MergeRequested(UUID sagaId, Collection<UUID> entitiesToMerge, String metadata) {
             this.sagaId = sagaId;
             this.entitiesToMerge = entitiesToMerge;
+            this.metadata = metadata;
         }
 
         public UUID getSagaId() {
@@ -19,6 +21,10 @@ public class MergeEvents {
 
         public Collection<UUID> getEntitiesToMerge() {
             return entitiesToMerge;
+        }
+
+        public String getMetadata() {
+            return metadata;
         }
     }
 

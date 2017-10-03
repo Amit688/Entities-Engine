@@ -27,10 +27,12 @@ public class MergeCommands {
     public static class CreateMergedFamily {
         private Collection<GenericRecord> entitiesToMerge;
         private UUID sagaId;
+        private String metadata;
 
-        public CreateMergedFamily(Collection<GenericRecord> entitiesToMerge, UUID sagaId) {
+        public CreateMergedFamily(Collection<GenericRecord> entitiesToMerge, UUID sagaId, String metadata) {
             this.entitiesToMerge = entitiesToMerge;
             this.sagaId = sagaId;
+            this.metadata = metadata;
         }
 
         public Collection<GenericRecord> getEntitiesToMerge() {
@@ -39,6 +41,10 @@ public class MergeCommands {
 
         public UUID getSagaId() {
             return sagaId;
+        }
+
+        public String getMetadata() {
+            return metadata;
         }
     }
 

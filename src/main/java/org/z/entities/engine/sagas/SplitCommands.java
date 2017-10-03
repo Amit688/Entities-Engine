@@ -26,10 +26,12 @@ public class SplitCommands {
     public static class SplitMergedEntity {
         private GenericRecord mergedEntity;
         private UUID sagaId;
+        private String metadata;
 
-        public SplitMergedEntity(GenericRecord mergedEntity, UUID sagaId) {
+        public SplitMergedEntity(GenericRecord mergedEntity, UUID sagaId, String metadata) {
             this.mergedEntity = mergedEntity;
             this.sagaId = sagaId;
+            this.metadata = metadata;
         }
 
         public GenericRecord getMergedEntity() {
@@ -38,6 +40,10 @@ public class SplitCommands {
 
         public UUID getSagaId() {
             return sagaId;
+        }
+
+        public String getMetadata() {
+            return metadata;
         }
     }
 

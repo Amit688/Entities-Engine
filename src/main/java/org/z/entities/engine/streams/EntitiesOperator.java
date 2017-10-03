@@ -8,10 +8,10 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface EntitiesOperator {
-    void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange);
+    void createEntity(Collection<SourceDescriptor> sourceDescriptors, UUID uuid, String stateChange, String metadata);
 
     void createEntity(Collection<SourceDescriptor> sourceDescriptors, Map<SourceDescriptor, GenericRecord> sons,
-                      UUID uuid, String stateChange);
+                      UUID uuid, String stateChange, String metadata);
 
     void stopEntity(UUID entityId, UUID sagaId);
 

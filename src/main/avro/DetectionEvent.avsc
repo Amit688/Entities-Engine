@@ -18,6 +18,11 @@
   	"name": "dataOffset",
   	"type": "long",
   	"doc" : "Data Offset"
+	},
+	{
+	"name": "metadata",
+	"type": "string",
+	"default": ""
 	}
   ]
 }

@@ -3,5 +3,5 @@
  "namespace" : "org.z.entities.schema",
  "doc": "This is a schema for split entities event",  
  "fields":
-[{"name": "metadata", "type":"string"},
+[{"name": "metadata", "type":"string", "default":""},
 {"name": "splittedEntityID", "type":"string"}]} 

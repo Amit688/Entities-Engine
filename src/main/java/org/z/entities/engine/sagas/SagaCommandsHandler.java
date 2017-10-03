@@ -59,7 +59,7 @@ public class SagaCommandsHandler {
 		for(Map.Entry<SourceDescriptor, GenericRecord> entry : lastStates.entrySet()) {
 			logger.debug(entry.getKey() + " ||| " + entry.getValue());
 		}
-		entitiesOperator.createEntity(sources, lastStates, newUuid, "CREATED");
+		entitiesOperator.createEntity(sources, lastStates, newUuid, "CREATED", command.getMetadata());
 		eventBus.publish(new GenericEventMessage<>(new MergeEvents.MergedFamilyCreated(command.getSagaId())));
 	}
 
@@ -69,7 +69,7 @@ public class SagaCommandsHandler {
 		for (GenericRecord entity : command.getEntitiesToRecover()) {
 			List<SourceDescriptor> sources = getSources(entity);
 			UUID uuid = getEntityUuid(entity);
-			entitiesOperator.createEntity(sources, uuid, "NONE");
+			entitiesOperator.createEntity(sources, uuid, "NONE", "");
 		}
 		eventBus.publish(new GenericEventMessage<>(new MergeEvents.DeletedEntitiesRecovered(command.getSagaId())));
 	}
@@ -89,7 +89,7 @@ public class SagaCommandsHandler {
 			Map<SourceDescriptor, GenericRecord> stateMap = new HashMap<>(1);
 			stateMap.put(sourceDescriptor, state);
 			entitiesOperator.createEntity(Arrays.asList(sourceDescriptor), stateMap, sourceDescriptor.getSystemUUID(),
-					"CREATED");
+					"CREATED", command.getMetadata());
 		}
 		eventBus.publish(new GenericEventMessage<>(new SplitEvents.MergedEntitySplit(command.getSagaId())));
 	}
@@ -99,7 +99,7 @@ public class SagaCommandsHandler {
 		logger.debug("commands handler recovering merged entity as requested by saga " + command.getSagaId());
 		List<SourceDescriptor> sources = getSources(command.getMergedEntity());
 		UUID uuid = getEntityUuid(command.getMergedEntity());
-		entitiesOperator.createEntity(sources, uuid, "NONE");
+		entitiesOperator.createEntity(sources, uuid, "NONE", "");
 		eventBus.publish(new GenericEventMessage<>(new SplitEvents.MergedEntityRecovered(command.getSagaId())));
 	}
 

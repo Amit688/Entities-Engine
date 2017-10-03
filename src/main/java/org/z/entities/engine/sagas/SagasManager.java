@@ -64,13 +64,14 @@ public class SagasManager implements Consumer<EntitiesEvent> {
         for (Object id : idsToMerge) {
             uuids.add(UUID.fromString(id.toString()));
         }
-        mergeEntities(uuids);
+        String metadata = (String) data.get("metadata");
+        mergeEntities(uuids, metadata);
     }
 
-    public UUID mergeEntities(Collection<UUID> entitiesToMerge) {
+    public UUID mergeEntities(Collection<UUID> entitiesToMerge, String metadata) {
         occupiedEntities.addAll(entitiesToMerge);
         UUID sagaId = UUID.randomUUID();
-        eventBus.publish(new GenericEventMessage(new MergeEvents.MergeRequested(sagaId, entitiesToMerge)));
+        eventBus.publish(new GenericEventMessage(new MergeEvents.MergeRequested(sagaId, entitiesToMerge, metadata)));
         return sagaId;
     }
 
@@ -85,7 +86,8 @@ public class SagasManager implements Consumer<EntitiesEvent> {
         UUID uuid = UUID.fromString(data.get("splittedEntityID").toString());
         occupiedEntities.add(uuid);
         UUID sagaId = UUID.randomUUID();
-        eventBus.publish(new GenericEventMessage(new SplitEvents.SplitRequested(sagaId, uuid)));
+        String metadata = (String) data.get("metadata");
+        eventBus.publish(new GenericEventMessage(new SplitEvents.SplitRequested(sagaId, uuid, metadata)));
         return sagaId;
     }
 

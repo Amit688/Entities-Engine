@@ -19,6 +19,7 @@ import java.util.UUID;
 public class MergeSaga {
     private UUID sagaId;
     private Collection<UUID> entitiesToMerge;
+    private String metadata;
     private List<GenericRecord> entitiesLastState;
 	final static public Logger logger = Logger.getLogger(MergeSaga.class);
 	static {
@@ -35,14 +36,15 @@ public class MergeSaga {
     @StartSaga
     @SagaEventHandler(associationProperty = "sagaId")
     public void stopEntities(MergeEvents.MergeRequested event) {
-        initSaga(event.getSagaId(), event.getEntitiesToMerge());
+        initSaga(event.getSagaId(), event.getEntitiesToMerge(), event.getMetadata());
         logger.debug("merge saga " + sagaId + " started");
         commandGateway.send(new MergeCommands.StopEntities(event.getEntitiesToMerge(), event.getSagaId()));
     }
 
-    private void initSaga(UUID sagaId, Collection<UUID> entitiesToMerge) {
+    private void initSaga(UUID sagaId, Collection<UUID> entitiesToMerge, String metadata) {
         this.sagaId = sagaId;
         this.entitiesToMerge = entitiesToMerge;
+        this.metadata = metadata;
         this.entitiesLastState = new ArrayList<>(entitiesToMerge.size());
     }
 
@@ -60,7 +62,7 @@ public class MergeSaga {
     private void validateAndProceed() {
         if (validationService.validateMerge(entitiesLastState)) {
         	logger.debug("merge saga " + sagaId + " found valid, proceeding");
-            commandGateway.send(new MergeCommands.CreateMergedFamily(entitiesLastState, sagaId));
+            commandGateway.send(new MergeCommands.CreateMergedFamily(entitiesLastState, sagaId, metadata));
         } else {
         	logger.debug("merge saga " + sagaId + " found invalid, restoring entities");
             commandGateway.send(new MergeCommands.RecoverEntities(entitiesLastState, sagaId));

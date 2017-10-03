@@ -64,13 +64,14 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
             BlockingQueue<GenericRecord> queue = new LinkedBlockingQueue<>();
             queue.add(record);
             reportsQueues.put(externalSystemId, queue);
-            publishToCreationTopic(externalSystemId);
+            String metadata = (String) record.get("metadata");
+            publishToCreationTopic(externalSystemId, metadata);
         }
 	}
 
-	private void publishToCreationTopic(String externalSystemId) {
+	private void publishToCreationTopic(String externalSystemId, String metadata) {
         try {
-            creationQueue.offer(getGenericRecordForCreation(externalSystemId));
+            creationQueue.offer(getGenericRecordForCreation(externalSystemId, metadata));
         } catch (IOException e) {
             e.printStackTrace();
         } catch (RestClientException e) {
@@ -78,12 +79,14 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
         }
     }
 
-	private GenericRecord getGenericRecordForCreation(String externalSystemID) throws IOException, RestClientException {
+	private GenericRecord getGenericRecordForCreation(String externalSystemID, String metadata)
+            throws IOException, RestClientException {
 		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
-		.setSourceName(sourceName)
-		.setExternalSystemID(externalSystemID)
-		.setDataOffset(3333L)
-		.build();
+		        .setSourceName(sourceName)
+		        .setExternalSystemID(externalSystemID)
+		        .setDataOffset(3333L)
+                .setMetadata(metadata)
+		        .build();
 
 		return detectionEvent;
 	}
