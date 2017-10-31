@@ -307,9 +307,9 @@ public class Main {
 					"},"+
 					"\"executor\": \"default-executor\","+
 					"\"fork-join-executor\": {"+
-					"	\"parallelism-factor\": 3,"+
+					"	\"parallelism-factor\": 32,"+
 					"	\"parallelism-max\": "+akkaThreadPoolSize+","+
-					"	\"parallelism-min\": 8,"+
+					"	\"parallelism-min\": 16,"+
 					"	\"task-peeking-mode\": \"FIFO\""+
 					"},"+
 					"\"thread-pool-executor\": {"+
