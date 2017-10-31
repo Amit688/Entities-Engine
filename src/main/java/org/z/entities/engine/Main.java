@@ -44,6 +44,9 @@ import org.z.entities.schema.MergeEvent;
 import org.z.entities.schema.SplitEvent;
 import org.z.entities.schema.SystemEntity;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -74,19 +77,24 @@ public class Main {
 		logger.debug("CONF_IND::::::::" + System.getenv("CONF_IND"));
 		logger.debug("INTERFACES_NAME::::::::" + System.getenv("INTERFACES_NAME"));
 		logger.debug("DEBUG_LEVEL::::::::" + System.getenv("DEBUG_LEVEL"));
+		logger.debug("AKKA_THREAD_POOL_SIZE::::::::" + System.getenv("AKKA_THREAD_POOL_SIZE"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
 		final ActorSystem system; 
 		final SchemaRegistryClient schemaRegistry;
 		final KafkaComponentsFactory componentsFactory;
 
-		if(!testing) {
-			//			if(Objects.equals(System.getenv("CONF_IND"),"true")) {
-			//				Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-			//				system = ActorSystem.create("sys", cfg);
-			//			} else {
-			system = ActorSystem.create();
-			//			}
+		if(!testing) { 
+			int akkaThreadPoolSize = Integer.parseInt(System.getenv("AKKA_THREAD_POOL_SIZE"));
+			if(akkaThreadPoolSize > 0) 
+			{
+				Config customConf = ConfigFactory.parseString(getAkkaConfig(akkaThreadPoolSize));
+				logger.debug("Custom config is : "+customConf.toString());
+				system = ActorSystem.create("sys", customConf);
+			}
+			else {
+				system = ActorSystem.create();
+			}
 			schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
 			componentsFactory = new KafkaComponentsFactory(system, schemaRegistry,
 					System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
@@ -277,5 +285,44 @@ public class Main {
 		System.out.print("occupied entities are: ");
 		uuids.forEach(uuid -> System.out.print(uuid + ", "));
 		logger.debug("\n");
+	}
+	
+
+	private static String getAkkaConfig(int akkaThreadPoolSize) {
+		
+		return "{\"akka\": {" +
+			"\"actor\": {" +
+				"\"default-blocking-io-dispatcher\": {"+
+					"\"executor\": \"thread-pool-executor\","+
+					"\"thread-pool-executor\": {"+
+						"\"fixed-pool-size\": "+akkaThreadPoolSize+
+					"},"+
+					"\"throughput\": 1,"+
+					"\"type\": \"Dispatcher\"},"+
+				"\"default-dispatcher\": {"+
+					"\"attempt-teamwork\": \"on\","+
+					"\"default-executor\": {"+
+						"\"fallback\": \"fork-join-executor\""+
+					"},"+
+					"\"executor\": \"default-executor\","+
+					"\"fork-join-executor\": {"+
+					"	\"parallelism-factor\": 3,"+
+					"	\"parallelism-max\": "+akkaThreadPoolSize+","+
+					"	\"parallelism-min\": 8,"+
+					"	\"task-peeking-mode\": \"FIFO\""+
+					"},"+
+					"\"thread-pool-executor\": {"+
+				"		\"allow-core-timeout\": \"on\","+
+				"		\"core-pool-size-factor\": 3,"+
+				"		\"core-pool-size-max\": "+akkaThreadPoolSize+","+
+				"		\"core-pool-size-min\": 8,"+
+				"		\"fixed-pool-size\": \"off\","+
+				"		\"keep-alive-time\": \"60s\","+
+				"		\"max-pool-size-factor\": 3,"+
+				"		\"max-pool-size-max\": "+akkaThreadPoolSize+","+
+				"		\"max-pool-size-min\": 8,"+
+				"		\"task-queue-size\": -1,"+
+				"		\"task-queue-type\": \"linked\""+
+				"	} }	}} }";
 	}
 }
