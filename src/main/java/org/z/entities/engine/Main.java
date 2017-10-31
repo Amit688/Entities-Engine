@@ -87,7 +87,7 @@ public class Main {
 		if(!testing) { 
 			int akkaThreadPoolSize = Integer.parseInt(System.getenv("AKKA_THREAD_POOL_SIZE"));
 			if(akkaThreadPoolSize > 0) 
-			{
+			{ 
 				Config customConf = ConfigFactory.parseString(getAkkaConfig(akkaThreadPoolSize));
 				logger.debug("Custom config is : "+customConf.toString());
 				system = ActorSystem.create("sys", customConf);
@@ -291,6 +291,7 @@ public class Main {
 	private static String getAkkaConfig(int akkaThreadPoolSize) {
 		
 		return "{\"akka\": {" +
+				"\"log-config-on-start\" : \"on\","+				
 			"\"actor\": {" +
 				"\"default-blocking-io-dispatcher\": {"+
 					"\"executor\": \"thread-pool-executor\","+
