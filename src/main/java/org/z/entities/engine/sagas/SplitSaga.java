@@ -3,6 +3,7 @@ package org.z.entities.engine.sagas;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.gateway.CommandGateway;
+import org.axonframework.eventhandling.saga.EndSaga;
 import org.axonframework.eventhandling.saga.SagaEventHandler;
 import org.axonframework.eventhandling.saga.SagaLifecycle;
 import org.axonframework.eventhandling.saga.StartSaga;
@@ -52,19 +53,22 @@ public class SplitSaga {
         }
     }
 
+    @EndSaga
     @SagaEventHandler(associationProperty = "sagaId")
     public void reportSuccess(SplitEvents.MergedEntitySplit event) {
         cleanup("Split operation successful");
     }
 
-    @SagaEventHandler(associationProperty = "sagaId")
+    @EndSaga
+    @SagaEventHandler(associationProperty = "sagaId")    
     public void reportFailure(SplitEvents.MergedEntityRecovered event) {
         cleanup("Split operation failed");
     }
 
     private void cleanup(String operationReport) {
     	logger.debug("split saga " + sagaId + " finished with report: " + operationReport);
-        commandGateway.send(new SagasManagerCommands.ReleaseEntities(new HashSet<>(Arrays.asList(mergedEntityId))));
-        SagaLifecycle.end();
-    }
+        commandGateway.send(new SagasManagerCommands.ReleaseEntities(new HashSet<>(Arrays.asList(mergedEntityId)))); 
+    } 
+    
+    
 }

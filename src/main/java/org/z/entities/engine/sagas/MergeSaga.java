@@ -4,6 +4,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.gateway.CommandGateway;
+import org.axonframework.eventhandling.saga.EndSaga;
 import org.axonframework.eventhandling.saga.SagaEventHandler;
 import org.axonframework.eventhandling.saga.SagaLifecycle;
 import org.axonframework.eventhandling.saga.StartSaga; 
@@ -69,11 +70,13 @@ public class MergeSaga {
         }
     }
 
+    @EndSaga
     @SagaEventHandler(associationProperty = "sagaId")
     public void reportSuccess(MergeEvents.MergedFamilyCreated event) {
         cleanup("Merge operation successful");
     }
 
+    @EndSaga
     @SagaEventHandler(associationProperty = "sagaId")
     public void reportFailure(MergeEvents.DeletedEntitiesRecovered event) {
         cleanup("Merge operation failed");
@@ -81,7 +84,6 @@ public class MergeSaga {
 
     private void cleanup(String operationReport) {
     	logger.debug("merge saga " + sagaId + " finished with report: " + operationReport);
-        commandGateway.send(new SagasManagerCommands.ReleaseEntities(entitiesToMerge));
-        SagaLifecycle.end();
+        commandGateway.send(new SagasManagerCommands.ReleaseEntities(entitiesToMerge));        
     }
 }
