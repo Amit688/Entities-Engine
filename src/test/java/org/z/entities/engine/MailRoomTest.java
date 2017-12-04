@@ -17,7 +17,11 @@ import static org.mockito.Mockito.*;
 import akka.stream.javadsl.SourceQueueWithComplete;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MailRoomTest {
+public class MailRoomTest extends MailRoom {
+
+	public MailRoomTest() {
+		super(); 
+	}
 
 	private MailRoom mailRoom;
 	@Mock
@@ -30,13 +34,19 @@ public class MailRoomTest {
 		mailRoom.setCreationQueue(creationQueue);
 	}
 
+	/**
+	 *  The mail room is getting messages from the kafka topic
+	 *  and fill a message queue for each externalSystemId
+	 *  only for the first time create the queue 
+	 *  the expected result is to create 1 queue that will have 1 message
+	 */
 	@Test
 	public void testSingleMessageForNewId() {
 
 		String externalSystemId = "externalSystemID0";
+		String metadata = "junit";
 		try {
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId, ""));
+			sendMessageToMailRoom("source0",externalSystemId,metadata); 
 		} catch (IOException | RestClientException e) {
 			fail();
 		}
@@ -47,17 +57,24 @@ public class MailRoomTest {
 		assertEquals(queue.poll().get("externalSystemID"), externalSystemId);
 		assertEquals(queue.size(), 0);
 
-		verify(creationQueue, times(1)).offer(any());
+		try {
+			verify(creationQueue, times(1)).offer(mailRoom.getGenericRecordForCreation(externalSystemId, metadata));
+		} catch (IOException | RestClientException e) {
+			fail();
+		}
 	}
-
+	/**
+	 *  The mail room is getting messages from the kafka topic
+	 *  and fill a message queue for each externalSystemId
+	 *  only for the first time create the queue 
+	 *  the expected result is to create 1 queue that will have 2 messages
+	 */
 	@Test
 	public void testManyMessagesForNewId() {
 		String externalSystemId = "externalSystemID0";
 		try {
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId, "firstMessage"));
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId, "secondMessage"));
+			sendMessageToMailRoom("source0",externalSystemId,"firstMessage");
+			sendMessageToMailRoom("source0",externalSystemId,"secondMessage"); 
 		} catch (IOException | RestClientException e) {
 			fail();
 		}
@@ -69,22 +86,28 @@ public class MailRoomTest {
 		assertEquals(queue.poll().get("metadata"), "secondMessage");
 		assertEquals(queue.size(), 0);
 
-		verify(creationQueue, times(1)).offer(any());
+		try {
+			verify(creationQueue, times(1)).offer(mailRoom.getGenericRecordForCreation(externalSystemId, "firstMessage"));
+		} catch (IOException | RestClientException e) {
+			fail();
+		}
 	}
-
+	/**
+	 *  The mail room is getting messages from the kafka topic
+	 *  and fill a message queue for each externalSystemId
+	 *  only for the first time create the queue 
+	 *  In that test the mail room got 4 messages for 2 externalSystemId
+	 *  the expected result is to create 2 queues and each queue will have 2 messages
+	 */
 	@Test
 	public void testManyMessagesFor2Id() {
 		String externalSystemId1 = "externalSystemID0";
 		String externalSystemId2 = "externalSystemID1";
 		try {
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId1, "firstMessage"));
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId1, "secondMessage"));
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId2, "firstMessage"));
-			mailRoom.accept(TestUtils.getGenericRecord("source0",
-					externalSystemId2, "secondMessage"));
+			sendMessageToMailRoom("source0",externalSystemId1,"firstMessage");
+			sendMessageToMailRoom("source0",externalSystemId1,"secondMessage");
+			sendMessageToMailRoom("source0",externalSystemId2,"firstMessage");
+			sendMessageToMailRoom("source0",externalSystemId2,"secondMessage"); 
 		} catch (IOException | RestClientException e) {
 			fail();
 		}
@@ -104,6 +127,10 @@ public class MailRoomTest {
 		assertEquals(queue.poll().get("metadata"), "secondMessage");
 		assertEquals(queue.size(), 0);
 
-		verify(creationQueue, times(2)).offer(any());
+		verify(creationQueue, times(2)).offer(any(GenericRecord.class));
+	}
+	
+	private void sendMessageToMailRoom(String sourceName,String externalSystemId,String metadata) throws IOException, RestClientException {
+		mailRoom.accept(TestUtils.getGenericRecord(sourceName,externalSystemId, metadata));	
 	}
 }

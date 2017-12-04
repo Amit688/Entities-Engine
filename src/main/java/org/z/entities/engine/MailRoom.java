@@ -9,7 +9,6 @@ import org.apache.log4j.Logger;
 import org.z.entities.engine.utils.Utils;
 import org.z.entities.schema.DetectionEvent;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,10 +27,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  * exteranlSystemID | Pair<ConcurrentLinkedQueue<GenericRecord>,SourceQueue<GenericRecord>>
  *
  */
-public class MailRoom implements java.util.function.Consumer<GenericRecord>,Closeable {
+public class MailRoom implements java.util.function.Consumer<GenericRecord> {
 	
     private String sourceName;
-    private KafkaProducer<Object, Object> producer;
 	private ConcurrentMap<String, BlockingQueue<GenericRecord>> reportsQueues;
 	private SourceQueueWithComplete<GenericRecord> creationQueue;
 
@@ -40,13 +38,16 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 		Utils.setDebugLevel(logger);
 	}
 	
-	public MailRoom(String sourceName, KafkaProducer<Object, Object> producer) {
+	public MailRoom(String sourceName) {
         this.sourceName = sourceName;
-        this.producer = producer;
 		this.reportsQueues = new ConcurrentHashMap<>();
 		this.creationQueue = null;
-	}
-
+	} 
+	
+	public MailRoom() {
+		
+	} 
+	
 	public void setCreationQueue(SourceQueueWithComplete<GenericRecord> queue) {
 		this.creationQueue = queue;
 	}
@@ -79,7 +80,7 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
         }
     }
 
-	private GenericRecord getGenericRecordForCreation(String externalSystemID, String metadata)
+	protected GenericRecord getGenericRecordForCreation(String externalSystemID, String metadata)
             throws IOException, RestClientException {
 		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
 		        .setSourceName(sourceName)
@@ -90,13 +91,9 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord>,Clos
 
 		return detectionEvent;
 	}
-
+	 
     public BlockingQueue<GenericRecord> getReportsQueue(String externalSystemId) {
         return reportsQueues.get(externalSystemId);
     }
-
-    @Override
-    public void close() throws IOException {
-        producer.close();
-    }
+ 
 }

@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 import org.z.entities.engine.SourceDescriptor;
 import org.z.entities.engine.utils.Utils;
 import org.z.entities.schema.BasicEntityAttributes;
+import org.z.entities.schema.Category;
 import org.z.entities.schema.EntityFamily;
 import org.z.entities.schema.GeneralEntityAttributes; 
 import org.z.entities.schema.SystemEntity;
@@ -90,14 +91,17 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     }
 
     private GenericRecord convertGeneralAttributes(GenericRecord data) {
-        GenericData.EnumSymbol category = convertEnum((GenericData.EnumSymbol) data.get("category"),
-        		GeneralEntityAttributes.SCHEMA$.getField("category").schema());
-        GenericData.EnumSymbol nationality = convertEnum((GenericData.EnumSymbol) data.get("nationality"),
-        		GeneralEntityAttributes.SCHEMA$.getField("nationality").schema());
+       // GenericData.EnumSymbol category = convertEnum((GenericData.EnumSymbol) data.get("category"),
+       // 		//GeneralEntityAttributes.SCHEMA$.getField("category").schema());
+       // 		Category.SCHEMA$);
+       // GenericData.EnumSymbol nationality = convertEnum((GenericData.EnumSymbol) data.get("nationality"),
+       // 		GeneralEntityAttributes.SCHEMA$.getField("nationality").schema());
         GenericRecordBuilder builder = new GenericRecordBuilder(GeneralEntityAttributes.SCHEMA$)
                 .set("basicAttributes", convertBasicAttributes((GenericRecord) data.get("basicAttributes")))
-                .set("category", category)
-                .set("nationality", nationality);
+                //.set("category", category)
+               // .set("nationality", nationality);
+               .set("category", data.get("category"))
+               .set("nationality", data.get("nationality"));
         copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "metadata"));
         return builder.build();
     }

@@ -40,8 +40,8 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     private LastStatePublisher lastStatePublisher;
     private Map<String, MailRoom> mailRooms;
     private KafkaComponentsFactory componentsFactory;
-    private Materializer materializer;
-    private Map<UUID, SourceQueueWithComplete<GenericRecord>> stopQueues;
+    protected Materializer materializer;
+    protected Map<UUID, SourceQueueWithComplete<GenericRecord>> stopQueues;
     
     final static public Logger logger = Logger.getLogger(EntitiesSupervisor.class);
 	static {
@@ -57,7 +57,11 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
         this.stopQueues = new HashMap<>();
     }
 
-    @Override
+    public EntitiesSupervisor() {
+		// TODO Auto-generated constructor stub
+	}
+
+	@Override
     public void accept(EntitiesEvent entitiesEvent) {
         try {
     		GenericRecord data = entitiesEvent.getData();
@@ -138,8 +142,11 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     private List<Source<GenericRecord, ?>> createSources(Collection<SourceDescriptor> sourceDescriptors) {
         List<Source<GenericRecord, ?>> sources = new ArrayList<>(sourceDescriptors.size());
         for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-            MailRoom mailRoom = mailRooms.get(sourceDescriptor.getSensorId());
+            MailRoom mailRoom = mailRooms.get(sourceDescriptor.getSensorId()); 
             BlockingQueue<GenericRecord> queue = mailRoom.getReportsQueue(sourceDescriptor.getReportsId());
+            if(queue == null) {
+            	throw new RuntimeException("Message queue is missing");
+            }
             Source<GenericRecord, ?> source = Source.fromGraph(new InterfaceSource(
                     queue, sourceDescriptor.getSensorId() + "-|-" + sourceDescriptor.getReportsId()));
             sources.add(source);
@@ -185,10 +192,11 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
             stopSource.offer(createStopMessage(sagaId));
         } else {
         	logger.error("Tried to stop non-existent entity " + entityId);
+        	throw new RuntimeException("Tried to stop non-existent entity " + entityId);
         }
     }
 
-    private GenericRecord createStopMessage(UUID sagaId) {
+    protected GenericRecord createStopMessage(UUID sagaId) {
         Schema schema = SchemaBuilder.builder().record("stopMeMessage").fields()
                 .optionalString("sagaId")
                 .endRecord();
