@@ -5,6 +5,7 @@ import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventhandling.EventBus;
 import org.axonframework.eventhandling.GenericEventMessage;
+import org.z.entities.engine.KafkaComponentsFactory;
 import org.z.entities.engine.Main;
 import org.z.entities.engine.SonAccessor;
 import org.z.entities.engine.SourceDescriptor;
@@ -21,14 +22,16 @@ import java.util.UUID;
 public class SagaCommandsHandler {
 	private EntitiesOperator entitiesOperator;
 	private EventBus eventBus;
+	private KafkaComponentsFactory componentsFactory;
 	final static public Logger logger = Logger.getLogger(Main.class);
 	static {
 		Utils.setDebugLevel(logger);
 	}
 
-	public SagaCommandsHandler(EntitiesOperator entitiesOperator, EventBus eventBus) {
+	public SagaCommandsHandler(EntitiesOperator entitiesOperator, EventBus eventBus, KafkaComponentsFactory componentsFactory) {
 		this.entitiesOperator = entitiesOperator;
 		this.eventBus = eventBus;
+		this.componentsFactory = componentsFactory;
 	}
 
 	@CommandHandler
@@ -49,7 +52,9 @@ public class SagaCommandsHandler {
 		Map<SourceDescriptor, GenericRecord> lastStates = new HashMap<>(sources.size());
 		for(GenericRecord entity : command.getEntitiesToMerge()) {
 			for(GenericRecord son : getSons(entity)) {
-				SourceDescriptor sourceDescriptor = SonAccessor.getSourceDescriptor(son);
+				
+				int partition = componentsFactory.getPartitionByKey(son);
+				SourceDescriptor sourceDescriptor = SonAccessor.getSourceDescriptor(son,partition);
 				GenericRecord lastState = getSonState(son);
 				sources.add(sourceDescriptor);
 				lastStates.put(sourceDescriptor, lastState);
@@ -84,7 +89,8 @@ public class SagaCommandsHandler {
 	public void splitEntity(SplitCommands.SplitMergedEntity command) {
 		List<GenericRecord> sons = (List<GenericRecord>) command.getMergedEntity().get("sons");
 		for (GenericRecord son : sons) {
-			SourceDescriptor sourceDescriptor = SonAccessor.getSourceDescriptor(son);
+			int partition = componentsFactory.getPartitionByKey(son);
+			SourceDescriptor sourceDescriptor = SonAccessor.getSourceDescriptor(son,partition);
 			GenericRecord state = (GenericRecord) son.get("entityAttributes");
 			Map<SourceDescriptor, GenericRecord> stateMap = new HashMap<>(1);
 			stateMap.put(sourceDescriptor, state);
@@ -112,7 +118,8 @@ public class SagaCommandsHandler {
 		List<GenericRecord> sons = (List<GenericRecord>) entity.get("sons");
 		List<SourceDescriptor> sources = new ArrayList<>(sons.size());
 		for (GenericRecord son : sons) {
-			sources.add(SonAccessor.getSourceDescriptor(son));
+			int partition = componentsFactory.getPartitionByKey(son);
+			sources.add(SonAccessor.getSourceDescriptor(son,partition));
 		}
 		return sources;
 	}

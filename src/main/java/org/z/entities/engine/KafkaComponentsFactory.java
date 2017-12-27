@@ -10,19 +10,25 @@ import akka.kafka.Subscription;
 import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
 import akka.kafka.javadsl.Producer;
+import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
+
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.utils.Utils;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -45,10 +51,9 @@ public class KafkaComponentsFactory {
 		if (this.sharingSources) {
 			this.consumerActor = system.actorOf((KafkaConsumerActor.props(createConsumerSettings())));
 		}
-		if (this.sharingSinks) {
-			ProducerSettings<Object, Object> producerSettings = createProducerSettings();
-			this.kafkaProducer = producerSettings.createKafkaProducer();
-		}
+ 
+		ProducerSettings<Object, Object> producerSettings = createProducerSettings();
+		this.kafkaProducer = producerSettings.createKafkaProducer();	 
 	}
 
 	/**
@@ -57,37 +62,58 @@ public class KafkaComponentsFactory {
 	 * @param topic
 	 * @param reportsId
 	 * @return
-	 */
+	 
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, String reportsId,long dataOffset) {
 		return getSource(topic,dataOffset).filter(record -> filterByReportsId(record, reportsId));
 	}
-
+	*/
+	
 	private boolean filterByReportsId(ConsumerRecord<Object, Object> incomingUpdate, String reportsId) {
 		GenericRecord data = (GenericRecord) incomingUpdate.value();
 		return data.get("externalSystemID").toString().equals(reportsId);
-	}
-
+	} 
+	
 	/**
 	 * Creates a source from a source descriptor
 	 *
 	 * @param descriptor
 	 * @return
-	 */
+	 
+	 * NOT IN USE
+	 
 	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(SourceDescriptor descriptor) {
 		return getSource(descriptor.getSensorId(), descriptor.getReportsId(),descriptor.getDataOffset());
 	}
+	*/
 
-	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic) {
+	public Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic){
+		int numOfPartitions = getNumOfPartitionForTopic(topic);
+		Set<TopicPartition> set = new HashSet<>();
+		for(int i = 0; i < numOfPartitions; i++) {
+			set.add(new TopicPartition(topic, i));
+		}
 		if (sharingSources) {
  
-			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(new TopicPartition(topic, 0)));
-		} else {
+			return Consumer.plainExternalSource(consumerActor, Subscriptions.assignment(set));
+		} else { 
 			return Consumer.plainSource(createConsumerSettings(),
-					(Subscription) Subscriptions.assignment(getTopicPartition(topic)));
+					(Subscription) Subscriptions.assignment(set));
 		}
+	} 
+ 
+	
+	public Source<ConsumerRecord<Object, Object>, ?> getSource(SourceDescriptor descriptor) { 
+		TopicPartition topicPartition = new TopicPartition(descriptor.getSensorId(), descriptor.getPartition());
+		
+		String reportsId = descriptor.getReportsId();
+		return Consumer.plainSource(createConsumerSettings(),
+				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset())) 
+				.filter(record -> filterByReportsId(record, reportsId));
 	}
 
+	/*
 	private Source<ConsumerRecord<Object, Object>, Consumer.Control> getSource(String topic, long offset) {
+		
 		if (sharingSources) {
 			return Consumer.plainExternalSource(consumerActor,
 					Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
@@ -96,6 +122,7 @@ public class KafkaComponentsFactory {
 					(Subscription) Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
 		}
 	}
+ */
 
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
 		KafkaAvroDeserializer keyDeserializer = new KafkaAvroDeserializer(schemaRegistry);
@@ -144,5 +171,33 @@ public class KafkaComponentsFactory {
 		} else {
 			return createProducerSettings().createKafkaProducer();
 		}
+	}
+	
+	public int getPartitionByKey (String topic,String key) {
+		KafkaProducer<Object, Object> producer = kafkaProducer;		
+
+		int numPartitions = producer.partitionsFor(topic).size();
+		try(KafkaAvroSerializer keySerializer = new KafkaAvroSerializer(schemaRegistry)) {
+			Map<String,String> map = new ConcurrentHashMap<String, String>();		
+			map.put("schema.registry.url", "http://fake-url");
+			map.put("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE));		
+			keySerializer.configure(map, true);
+			
+			byte[] keyBytes	 = keySerializer.serialize(topic, key);
+			keySerializer.close();
+			return Utils.toPositive(Utils.murmur2(keyBytes)) % numPartitions;					
+		}	
+	} 
+	
+	public int getPartitionByKey(GenericRecord record) {
+        GenericRecord attributes = (GenericRecord) record.get("entityAttributes");
+        String key = attributes.get("externalSystemID").toString();
+        String topic = ((GenericRecord) attributes.get("basicAttributes")).get("sourceName").toString();  		
+		return getPartitionByKey (topic,key);	
+	}
+	
+	public int getNumOfPartitionForTopic(String topic) {
+		KafkaProducer<Object, Object> producer = kafkaProducer;	
+		return producer.partitionsFor(topic).size(); 
 	}
 }

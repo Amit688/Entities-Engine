@@ -8,15 +8,26 @@ import akka.stream.stage.AbstractInHandler;
 import akka.stream.stage.AbstractOutHandler;
 import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
+
 import org.apache.avro.generic.GenericRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.log4j.Logger;
 import org.z.entities.engine.EntitiesSupervisor;
+import org.z.entities.engine.utils.Utils;
 
 import java.util.UUID;
 
-public class StreamCompleter extends GraphStage<FlowShape<GenericRecord, GenericRecord>> {
+public class StreamCompleter extends GraphStage<FlowShape<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>>> {
     private EntitiesSupervisor entitiesSupervisor;
     private EntityProcessor entityProcessor;
     private UUID uuid;
+    
+	final static public Logger logger = Logger.getLogger(StreamCompleter.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}
+
+    
 
     public StreamCompleter(EntitiesSupervisor entitiesSupervisor, EntityProcessor entityProcessor) {
         this.entitiesSupervisor = entitiesSupervisor;
@@ -24,13 +35,13 @@ public class StreamCompleter extends GraphStage<FlowShape<GenericRecord, Generic
         this.uuid = entityProcessor.getUuid();
     }
 
-    public final Inlet<GenericRecord> in = Inlet.create("Filter.in");
-    public final Outlet<GenericRecord> out = Outlet.create("Filter.out");
+    public final Inlet<ConsumerRecord<Object, Object>> in = Inlet.create("Filter.in");
+    public final Outlet<ConsumerRecord<Object, Object>> out = Outlet.create("Filter.out");
 
-    private final FlowShape<GenericRecord, GenericRecord> shape = FlowShape.of(in, out);
+    private final FlowShape<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>> shape = FlowShape.of(in, out);
 
     @Override
-    public FlowShape<GenericRecord, GenericRecord> shape() {
+    public FlowShape<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>> shape() {
         return shape;
     }
 
@@ -40,14 +51,15 @@ public class StreamCompleter extends GraphStage<FlowShape<GenericRecord, Generic
                 setHandler(in, new AbstractInHandler() {
                     @Override
                     public void onPush() {
-                        GenericRecord record = grab(in);
-//                        System.out.println("Completer " + uuid + " is doing push " + record);
+                    	ConsumerRecord<Object, Object> input = grab(in); 
+                         logger.debug("Completer " + uuid + " is doing push " + input.value());
+                    	GenericRecord record = (GenericRecord) input.value();
                         if (record.getSchema().getName().equals("stopMeMessage")) {
-//                            System.out.println("Completer " + uuid + " detected stop message");
+                        	logger.debug("Completer " + uuid + " detected stop message");
                             notifyEntitiesSupervisor(record);
                             completeStage();
                         } else {
-                            push(out, record);
+                            push(out, input);
                         }
                     }
 
@@ -67,7 +79,7 @@ public class StreamCompleter extends GraphStage<FlowShape<GenericRecord, Generic
                 setHandler(out, new AbstractOutHandler() {
                     @Override
                     public void onPull() throws Exception {
-//                        System.out.println("Completer " + uuid + " is being pulled");
+                    	logger.debug("Completer " + uuid + " is being pulled");
                         pull(in);
                     }
                 });

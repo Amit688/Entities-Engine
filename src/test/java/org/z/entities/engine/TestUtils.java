@@ -30,8 +30,7 @@ public class TestUtils {
 				.setLong$(entityReport.getXlong())
 				.build();
 
-		BasicEntityAttributes basicEntity = BasicEntityAttributes.newBuilder().setCoordinate(coordinate)
-				.setEntityOffset(0)
+		BasicEntityAttributes basicEntity = BasicEntityAttributes.newBuilder().setCoordinate(coordinate) 
 				.setIsNotTracked(false)
 				.setSourceName(entityReport.getSource_name())
 				.build();
@@ -48,6 +47,7 @@ public class TestUtils {
 				.setSpeed(entityReport.getSpeed())
 				.setBasicAttributes(basicEntity)
 				.setMetadata(metadata)
+				.setLastStateOffset(0)
 				.build();
 		
 		return entity;

@@ -61,7 +61,7 @@ import java.util.UUID;
  */
 public class Main {
 
-	public static boolean testing = false;
+	public static boolean testing = true;
 	final static public Logger logger = Logger.getLogger(Main.class);
 	static {
 		Utils.setDebugLevel(logger);
@@ -111,7 +111,7 @@ public class Main {
 			schemaRegistry = new MockSchemaRegistryClient();
 			registerSchemas(schemaRegistry);
 			componentsFactory = new KafkaComponentsFactory(system, schemaRegistry,
-					System.getenv("KAFKA_ADDRESS"), false,true);
+					System.getenv("KAFKA_ADDRESS"), false,false);
 		}
 
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
@@ -128,13 +128,13 @@ public class Main {
 				mailRooms, componentsFactory, materializer);
 		LocalEntitiesOperator entitiesOperator = new LocalEntitiesOperator(supervisor);
 		SagasManager sagasManager = new SagasManager();
-		Configuration axonConfiguration = axonSetup(lastStatePublisher, entitiesOperator, sagasManager);
+		Configuration axonConfiguration = axonSetup(lastStatePublisher, entitiesOperator, sagasManager,componentsFactory);
 
 		createSupervisorStream(materializer, supervisor, mailRooms);
 		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
 		if(testing) {
-			Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory); 
-			simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
+	 		Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory); 
+			//simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
 		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -154,7 +154,7 @@ public class Main {
 	}
 
 	private static MailRoom createBackOfficeStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, String sourceName) {
-		MailRoom mailRoom = new MailRoom(sourceName, sourceFactory.getKafkaProducer());
+		MailRoom mailRoom = new MailRoom(sourceName);
 		sourceFactory.getSource(sourceName)
 		.via(Flow.fromFunction(r -> (GenericRecord) r.value()))
 		.to(Sink.foreach(mailRoom::accept))
@@ -202,7 +202,7 @@ public class Main {
 	}
 
 	private static Configuration axonSetup(EventBusPublisher eventBusPublisher, LocalEntitiesOperator entitiesOperator,
-			SagasManager sagasManager) {
+			SagasManager sagasManager, KafkaComponentsFactory componentsFactory) {
 		Configuration configuration = DefaultConfigurer.defaultConfiguration()
 				.configureCommandBus(c -> {
 					AsynchronousCommandBus commandBus = new AsynchronousCommandBus();
@@ -210,11 +210,10 @@ public class Main {
 					return commandBus;
 				})
 				.configureEmbeddedEventStore(c -> new InMemoryEventStorageEngine())
-				.registerCommandHandler(c -> new SagaCommandsHandler(entitiesOperator, c.eventBus()))
+				.registerCommandHandler(c -> new SagaCommandsHandler(entitiesOperator, c.eventBus(),componentsFactory))
 				.registerCommandHandler(c -> sagasManager)
 				.registerModule(SagaConfiguration.subscribingSagaManager(MergeSaga.class))
 				.registerModule(SagaConfiguration.subscribingSagaManager(SplitSaga.class))
-				.registerComponent(MergeValidationService.class, c -> new MergeValidationService())
 				.registerComponent(SplitValidationService.class, c-> new SplitValidationService())
 				.buildConfiguration();
 		configuration.start();
@@ -254,6 +253,8 @@ public class Main {
 		Thread.sleep(2000);
 		printCurrentUuids(supervisor);
 		printOccupiedUuids(sagasManager);
+		
+		Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
 
 		//        Simulator.writeSplit(system, materializer, schemaRegistry,
 		//                supervisor.getAllUuids().iterator().next());

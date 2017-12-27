@@ -10,13 +10,14 @@ import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
 
 import org.apache.avro.generic.GenericRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.log4j.Logger; 
 import org.z.entities.engine.utils.Utils;
 
-public class EntityProcessorStage extends GraphStage<FlowShape<GenericRecord, ProducerRecord<Object, Object>>> {
+public class EntityProcessorStage extends GraphStage<FlowShape<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>>> {
 
-    public final Inlet<GenericRecord> in = Inlet.create("Processor.in");
+    public final Inlet<ConsumerRecord<Object, Object>> in = Inlet.create("Processor.in");
     public final Outlet<ProducerRecord<Object, Object>> out = Outlet.create("Processor.out");
     private EntityProcessor entityProcessor;
     private boolean sendInitialState;
@@ -28,12 +29,12 @@ public class EntityProcessorStage extends GraphStage<FlowShape<GenericRecord, Pr
     public EntityProcessorStage(EntityProcessor entityProcessor, boolean sendInitialState) {
         this.entityProcessor = entityProcessor;
         this.sendInitialState = sendInitialState;
-        logger.debug(sendInitialState);
+        logger.debug("sendInitialState ="+sendInitialState);
     }
 
-    private final FlowShape<GenericRecord, ProducerRecord<Object, Object>> shape = FlowShape.of(in, out);
+    private final FlowShape<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>> shape = FlowShape.of(in, out);
     @Override
-    public FlowShape<GenericRecord, ProducerRecord<Object, Object>> shape() {
+    public FlowShape<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>> shape() {
         return shape;
     }
 

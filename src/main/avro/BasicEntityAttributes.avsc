@@ -12,5 +12,4 @@
 	[ {"name": "lat","type": "double"},
 	  {"name": "long","type": "double"}]}},
 	  {"name": "isNotTracked","type": "boolean"},
-	  {"name": "entityOffset","type": "long"},
 	  {"name": "sourceName", "type": "string"}]}

@@ -12,5 +12,6 @@
 	  	  {"name": "category","type": {"name": "Category", "type": "enum","symbols" : ["airplane", "boat"]}},
 		  {"name": "pictureURL","type": "string"},
 		  {"name": "height","type": "double"},
-		  {"name": "nickname","type": "string"},
+		  {"name": "nickname","type": "string"},		  
+       	  {"name": "lastStateOffset","type": "long"},
 		  {"name": "externalSystemID","type": "string","doc" : "This is ID given be external system."}]}

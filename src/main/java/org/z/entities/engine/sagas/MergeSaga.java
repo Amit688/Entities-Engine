@@ -1,12 +1,10 @@
 package org.z.entities.engine.sagas;
 
-import org.apache.avro.generic.GenericRecord;
-import org.apache.kafka.clients.producer.Producer;
+import org.apache.avro.generic.GenericRecord; 
 import org.apache.log4j.Logger;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.eventhandling.saga.EndSaga;
-import org.axonframework.eventhandling.saga.SagaEventHandler;
-import org.axonframework.eventhandling.saga.SagaLifecycle;
+import org.axonframework.eventhandling.saga.SagaEventHandler; 
 import org.axonframework.eventhandling.saga.StartSaga; 
 import org.z.entities.engine.utils.Utils;
 
@@ -30,9 +28,7 @@ public class MergeSaga {
     @Inject
     private transient CommandGateway commandGateway;
     @Inject
-    private transient MergeValidationService validationService;
-    @Inject
-    private transient Producer<String, String> messageProducer;
+    private transient MergeValidationService validationService; 
 
     @StartSaga
     @SagaEventHandler(associationProperty = "sagaId")
@@ -61,6 +57,8 @@ public class MergeSaga {
     }
 
     private void validateAndProceed() {
+    	if(validationService == null) 
+     		validationService = new MergeValidationService();
         if (validationService.validateMerge(entitiesLastState)) {
         	logger.debug("merge saga " + sagaId + " found valid, proceeding");
             commandGateway.send(new MergeCommands.CreateMergedFamily(entitiesLastState, sagaId, metadata));

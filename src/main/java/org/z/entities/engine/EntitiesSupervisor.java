@@ -1,5 +1,6 @@
 package org.z.entities.engine;
 
+import akka.NotUsed;
 import akka.stream.ClosedShape;
 import akka.stream.Materializer;
 import akka.stream.OverflowStrategy;
@@ -15,6 +16,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.log4j.Logger;
 import org.z.entities.engine.streams.EntityProcessor;
@@ -38,10 +40,10 @@ import java.util.function.Consumer;
 
 public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     private LastStatePublisher lastStatePublisher;
-    private Map<String, MailRoom> mailRooms;
+  //  private Map<String, MailRoom> mailRooms;
     private KafkaComponentsFactory componentsFactory;
     protected Materializer materializer;
-    protected Map<UUID, SourceQueueWithComplete<GenericRecord>> stopQueues;
+    protected Map<UUID, SourceQueueWithComplete<ConsumerRecord<Object, Object>>> stopQueues;
     
     final static public Logger logger = Logger.getLogger(EntitiesSupervisor.class);
 	static {
@@ -51,7 +53,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     public EntitiesSupervisor(LastStatePublisher lastStatePublisher, Map<String, MailRoom> mailRooms,
                               KafkaComponentsFactory componentsFactory, Materializer materializer) {
         this.lastStatePublisher = lastStatePublisher;
-        this.mailRooms = mailRooms;
+    //    this.mailRooms = mailRooms;
         this.componentsFactory = componentsFactory;
         this.materializer = materializer;
         this.stopQueues = new HashMap<>();
@@ -88,6 +90,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
 				(long)data.get("dataOffset"),
+				componentsFactory.getPartitionByKey(data.get("sourceName").toString(), data.get("externalSystemID").toString()),
 				UUID.randomUUID());
 		logger.debug("creating entity manager stream for source " + sourceDescriptor);
 		String metadata = (String) data.get("metadata");
@@ -121,51 +124,52 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
                 preferredSource, stateChange, metadata);
         EntityProcessorStage entityProcessorStage = new EntityProcessorStage(entityProcessor, sendInitialState);
         StreamCompleter streamCompleter = new StreamCompleter(this, entityProcessor);
-        SourceQueueWithComplete<GenericRecord> stopQueue =
+        SourceQueueWithComplete<ConsumerRecord<Object, Object>> stopQueue =
                 createStream(sourceDescriptors, entityProcessorStage, streamCompleter);
         stopQueues.put(uuid, stopQueue);
     }
 
-    private SourceQueueWithComplete<GenericRecord> createStream(
+    private SourceQueueWithComplete<ConsumerRecord<Object, Object>> createStream(
             Collection<SourceDescriptor> sourceDescriptors,
             EntityProcessorStage entityProcessorStage,
             StreamCompleter streamCompleter) {
-        List<Source<GenericRecord, ?>> sources = createSources(sourceDescriptors);
-        Source<GenericRecord, SourceQueueWithComplete<GenericRecord>> stopSource =
+        List<Source<ConsumerRecord<Object, Object>, ?>> sources = createSources(sourceDescriptors);
+        Source<ConsumerRecord<Object, Object>, SourceQueueWithComplete<ConsumerRecord<Object, Object>>> stopSource =
                 Source.queue(1, OverflowStrategy.backpressure());
-        Flow<GenericRecord, GenericRecord, ?> completerFlow = Flow.fromGraph(streamCompleter);
-        Flow<GenericRecord, ProducerRecord<Object, Object>, ?> processorFlow = Flow.fromGraph(entityProcessorStage);
+        Flow<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>, ?> completerFlow = Flow.fromGraph(streamCompleter);
+        Flow<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>, ?> processorFlow = Flow.fromGraph(entityProcessorStage);
 
         return createAndRunGraph(sources, stopSource, completerFlow, processorFlow);
     }
 
-    private List<Source<GenericRecord, ?>> createSources(Collection<SourceDescriptor> sourceDescriptors) {
-        List<Source<GenericRecord, ?>> sources = new ArrayList<>(sourceDescriptors.size());
+    private List<Source<ConsumerRecord<Object, Object>, ?>> createSources(Collection<SourceDescriptor> sourceDescriptors) {
+        List<Source<ConsumerRecord<Object, Object>, ?>> sources = new ArrayList<>(sourceDescriptors.size());
         for (SourceDescriptor sourceDescriptor : sourceDescriptors) {
-            MailRoom mailRoom = mailRooms.get(sourceDescriptor.getSensorId()); 
-            BlockingQueue<GenericRecord> queue = mailRoom.getReportsQueue(sourceDescriptor.getReportsId());
-            if(queue == null) {
-            	throw new RuntimeException("Message queue is missing");
-            }
-            Source<GenericRecord, ?> source = Source.fromGraph(new InterfaceSource(
-                    queue, sourceDescriptor.getSensorId() + "-|-" + sourceDescriptor.getReportsId()));
+            //MailRoom mailRoom = mailRooms.get(sourceDescriptor.getSensorId()); 
+            //BlockingQueue<GenericRecord> queue = mailRoom.getReportsQueue(sourceDescriptor.getReportsId());
+            //if(queue == null) {
+            //	throw new RuntimeException("Message queue is missing");
+            //} 
+            //Source<GenericRecord, ?> source = Source.fromGraph(new InterfaceSource(
+            //       queue, sourceDescriptor.getSensorId() + "-|-" + sourceDescriptor.getReportsId()));
+            Source<ConsumerRecord<Object, Object>, ?> source = componentsFactory.getSource(sourceDescriptor);
             sources.add(source);
         }
         return sources;
     }
 
-    private SourceQueueWithComplete<GenericRecord> createAndRunGraph(List<Source<GenericRecord, ?>> sources,
-                                   Source<GenericRecord, SourceQueueWithComplete<GenericRecord>> stopSource,
-                                   Flow<GenericRecord, GenericRecord, ?> completerFlow,
-                                   Flow<GenericRecord, ProducerRecord<Object, Object>, ?> processorFlow) {
-        final RunnableGraph<SourceQueueWithComplete<GenericRecord>> result = RunnableGraph.fromGraph(GraphDSL.create(
+    private SourceQueueWithComplete<ConsumerRecord<Object, Object>> createAndRunGraph(List<Source<ConsumerRecord<Object, Object>, ?>> sources,
+                                   Source<ConsumerRecord<Object, Object>, SourceQueueWithComplete<ConsumerRecord<Object, Object>>> stopSource,
+                                   Flow<ConsumerRecord<Object, Object>, ConsumerRecord<Object, Object>, ?> completerFlow,
+                                   Flow<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>, ?> processorFlow) {
+        final RunnableGraph<SourceQueueWithComplete<ConsumerRecord<Object, Object>>> result = RunnableGraph.fromGraph(GraphDSL.create(
                 componentsFactory.getSink(),
                 stopSource,
                 Keep.right(),
                 (builder, out, stop) -> {
-                    final akka.stream.scaladsl.MergePreferred.MergePreferredShape<GenericRecord> merge =
-                            builder.add(MergePreferred.create(sources.size()));
-                    for (Source<GenericRecord, ?> source : sources) {
+                    final akka.stream.scaladsl.MergePreferred.MergePreferredShape<ConsumerRecord<Object, Object>> merge =
+                            builder.add(MergePreferred.create(sources.size())); 
+                    for (Source<ConsumerRecord<Object, Object>, ?> source : sources) {
                         builder.from(builder.add(source))
                                 .toFanIn(merge);
                     }
@@ -186,7 +190,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
     }
 
     public void stopEntity(UUID entityId, UUID sagaId) {
-        SourceQueueWithComplete<GenericRecord> stopSource = stopQueues.get(entityId);
+        SourceQueueWithComplete<ConsumerRecord<Object, Object>> stopSource = stopQueues.get(entityId);
         if (stopSource != null) {
         	logger.debug("EntitiesSupervisor stopping entity " + entityId);
             stopSource.offer(createStopMessage(sagaId));
@@ -196,7 +200,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
         }
     }
 
-    protected GenericRecord createStopMessage(UUID sagaId) {
+    protected ConsumerRecord<Object, Object> createStopMessage(UUID sagaId) {
         Schema schema = SchemaBuilder.builder().record("stopMeMessage").fields()
                 .optionalString("sagaId")
                 .endRecord();
@@ -205,7 +209,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
         if (sagaId != null) {
             builder.set("sagaId", sagaId.toString());
         }
-        return builder.build();
+        return new ConsumerRecord<Object, Object>("topic",0,0,"dummyKey",builder.build()); 
     }
 
     public void notifyOfStreamCompletion(UUID entityId, GenericRecord lastState, UUID sagaId) {

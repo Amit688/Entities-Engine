@@ -6,13 +6,15 @@ public class SourceDescriptor {
 	private UUID systemUUID;
 	private String sensorId;
 	private String reportsId;
+	private int partition;
 	private long dataOffset;
 	
-	public SourceDescriptor(String sensorId, String reportsId, long dataOffset, UUID uuid) {
+	public SourceDescriptor(String sensorId, String reportsId, long dataOffset, int partition, UUID uuid) {
 		this.sensorId = sensorId;
 		this.reportsId = reportsId;
 		this.dataOffset = dataOffset;
-		this.systemUUID = uuid;
+		this.partition = partition;
+		this.systemUUID = uuid;		
 	}
 
 	public String getSensorId() { return sensorId;}
@@ -22,6 +24,8 @@ public class SourceDescriptor {
 	public UUID getSystemUUID() { return systemUUID; }
 	
 	public long getDataOffset() { return dataOffset; }
+	
+	public int getPartition() { return partition; }
 
 	@Override
 	public int hashCode() {
@@ -63,7 +67,8 @@ public class SourceDescriptor {
 
 	@Override
 	public String toString() {
-		return "TopicDescriptor [sensorId=" + sensorId + ", reportsId=" + reportsId + ", "
-				+ ",dataOffset="+dataOffset +" systemUUID=" + systemUUID.toString() + "]";
-	}
+		return "SourceDescriptor [systemUUID=" + systemUUID + ", sensorId="
+				+ sensorId + ", reportsId=" + reportsId + ", partition="
+				+ partition + ", dataOffset=" + dataOffset + "]";
+	} 
 }

@@ -4,6 +4,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.log4j.Logger; 
 import org.z.entities.engine.SourceDescriptor;
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
-public class EntityProcessor implements Function<GenericRecord, ProducerRecord<Object, Object>> {
+public class EntityProcessor implements Function<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>> {
 
     private UUID uuid;
     private Map<SourceDescriptor, GenericRecord> sons;
@@ -50,15 +51,16 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     }
 
     @Override
-    public ProducerRecord<Object, Object> apply(GenericRecord data) {
-        try {
-            logger.debug("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
+    public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {
+        try { 
+        	logger.debug("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
             logger.debug("sons are:");
             for (SourceDescriptor e: sons.keySet())
             	logger.debug("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
+            GenericRecord data = (GenericRecord) record.value();
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
-            GenericRecord sonAttributes = convertGeneralAttributes(data);
+            GenericRecord sonAttributes = convertGeneralAttributes(data,record.offset());
             sons.put(sourceDescriptor, sonAttributes);
             try {
                 ProducerRecord<Object, Object> guiUpdate = generateGuiUpdate();
@@ -90,7 +92,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 + sourceName + ", " + externalSystemID);
     }
 
-    private GenericRecord convertGeneralAttributes(GenericRecord data) {
+    private GenericRecord convertGeneralAttributes(GenericRecord data, long lastStateOffset) {
        // GenericData.EnumSymbol category = convertEnum((GenericData.EnumSymbol) data.get("category"),
        // 		//GeneralEntityAttributes.SCHEMA$.getField("category").schema());
        // 		Category.SCHEMA$);
@@ -101,7 +103,8 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
                 //.set("category", category)
                // .set("nationality", nationality);
                .set("category", data.get("category"))
-               .set("nationality", data.get("nationality"));
+               .set("nationality", data.get("nationality"))
+               .set("lastStateOffset", lastStateOffset+1);
         copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "metadata"));
         return builder.build();
     }
@@ -112,7 +115,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
         copyFields(coordinateData, coordinateBuilder, Arrays.asList("lat", "long"));
         GenericRecordBuilder builder = new GenericRecordBuilder(BasicEntityAttributes.SCHEMA$)
                 .set("coordinate", coordinateBuilder.build());
-        copyFields(data, builder, Arrays.asList("isNotTracked", "entityOffset", "sourceName"));
+        copyFields(data, builder, Arrays.asList("isNotTracked", "sourceName"));
         return builder.build();
     }
 
@@ -121,11 +124,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
             destination.set(field, source.get(field));
         }
     }
-
-    private GenericData.EnumSymbol convertEnum(GenericData.EnumSymbol source, Schema targetSchema) {
-        return new GenericData.EnumSymbol(targetSchema, source.toString());
-    }
-
+ 
     public ProducerRecord<Object, Object> generateGuiUpdate() {
         return new ProducerRecord<>("update", uuid.toString(), getCurrentState());
     }
@@ -163,7 +162,7 @@ public class EntityProcessor implements Function<GenericRecord, ProducerRecord<O
     private GenericRecord createSingleEntityUpdate(GenericRecord latestUpdate, UUID systemUUID) {
         return new GenericRecordBuilder(SystemEntity.SCHEMA$)
                 .set("entityID", systemUUID.toString())
-                .set("entityAttributes", latestUpdate)
+                .set("entityAttributes", latestUpdate) 
                 .build();
     } 
 }
