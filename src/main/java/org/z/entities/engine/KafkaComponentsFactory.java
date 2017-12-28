@@ -104,7 +104,7 @@ public class KafkaComponentsFactory {
 	
 	public Source<ConsumerRecord<Object, Object>, ?> getSource(SourceDescriptor descriptor) { 
 		TopicPartition topicPartition = new TopicPartition(descriptor.getSensorId(), descriptor.getPartition());
-		
+		logger.debug("Create source for new entity  - "+descriptor);
 		String reportsId = descriptor.getReportsId();
 		return Consumer.plainSource(createConsumerSettings(),
 				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset())) 
