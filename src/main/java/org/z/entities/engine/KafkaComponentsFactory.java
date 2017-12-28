@@ -41,6 +41,11 @@ public class KafkaComponentsFactory {
 	private final boolean sharingSinks;
 	private ActorRef consumerActor;
 	private KafkaProducer<Object, Object> kafkaProducer = null;
+	final static private Logger logger = Logger.getLogger(KafkaComponentsFactory.class);
+	static {
+		org.z.entities.engine.utils.Utils.setDebugLevel(logger);
+	}
+
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean sharingSources, boolean sharingSinks) {
