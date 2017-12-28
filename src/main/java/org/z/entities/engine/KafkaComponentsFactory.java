@@ -9,8 +9,7 @@ import akka.kafka.ProducerSettings;
 import akka.kafka.Subscription;
 import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
-import akka.kafka.javadsl.Producer;
-import akka.stream.javadsl.Flow;
+import akka.kafka.javadsl.Producer; 
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
@@ -24,8 +23,8 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Utils;
+import org.apache.log4j.Logger;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +39,11 @@ public class KafkaComponentsFactory {
 	private final boolean sharingSinks;
 	private ActorRef consumerActor;
 	private KafkaProducer<Object, Object> kafkaProducer = null;
+    final static private Logger logger = Logger.getLogger(KafkaComponentsFactory.class);
+	static {
+		org.z.entities.engine.utils.Utils.setDebugLevel(logger);
+	}
+
 	
 	public KafkaComponentsFactory(ActorSystem system, SchemaRegistryClient schemaRegistry, String kafkaUrl,
 								  boolean sharingSources, boolean sharingSinks) {
@@ -104,6 +108,8 @@ public class KafkaComponentsFactory {
 	
 	public Source<ConsumerRecord<Object, Object>, ?> getSource(SourceDescriptor descriptor) { 
 		TopicPartition topicPartition = new TopicPartition(descriptor.getSensorId(), descriptor.getPartition());
+		
+		logger.debug("Create source for - "+descriptor);
 		
 		String reportsId = descriptor.getReportsId();
 		return Consumer.plainSource(createConsumerSettings(),
