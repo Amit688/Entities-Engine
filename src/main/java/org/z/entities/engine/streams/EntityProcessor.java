@@ -64,9 +64,11 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
             		related = true;
             	}
             }	
-            if(!related) 
-            	return null;
-            
+            if(!related) {
+            	logger.debug("Exit from processor");
+            	return null;            
+            }
+             
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
             GenericRecord sonAttributes = convertGeneralAttributes(data,record.offset());
