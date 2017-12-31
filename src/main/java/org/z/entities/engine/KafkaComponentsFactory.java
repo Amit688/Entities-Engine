@@ -113,8 +113,8 @@ public class KafkaComponentsFactory {
 		logger.debug("Create source for new entity  - "+descriptor);
 		String reportsId = descriptor.getReportsId();
 		return Consumer.plainSource(createConsumerSettings(),
-				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset())) 
-				.filter(record -> filterByReportsId(record, reportsId));
+				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset()));
+			//	.filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	/*
