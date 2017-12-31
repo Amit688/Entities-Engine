@@ -23,6 +23,11 @@
   	"name": "dataOffset",
   	"type": "long",
   	"doc" : "Data Offset"
+	},
+	{
+  	"name": "partition",
+  	"type": "int",
+  	"doc" : "partition"
 	}
   ]
 }

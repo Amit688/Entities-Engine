@@ -132,6 +132,6 @@ public class MailRoomTest extends MailRoom {
 	}
 	*/
 	private void sendMessageToMailRoom(String sourceName,String externalSystemId,String metadata) throws IOException, RestClientException {
-		mailRoom.accept(TestUtils.getGenericRecord(sourceName,externalSystemId, metadata));	
+	//	mailRoom.accept(TestUtils.getGenericRecord(sourceName,externalSystemId, metadata));	
 	} 
 }

@@ -4,6 +4,7 @@ import akka.stream.javadsl.SourceQueueWithComplete;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 
 import org.apache.avro.generic.GenericRecord;  
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.z.entities.engine.utils.Utils;
@@ -30,7 +31,7 @@ import javax.naming.directory.BasicAttribute;
  * exteranlSystemID | Pair<ConcurrentLinkedQueue<GenericRecord>,SourceQueue<GenericRecord>>
  *
  */
-public class MailRoom implements java.util.function.Consumer<GenericRecord> {
+public class MailRoom implements java.util.function.Consumer<ConsumerRecord<Object, Object>> {
 	
     private String sourceName;
 	//private ConcurrentMap<String, BlockingQueue<GenericRecord>> reportsQueues;
@@ -58,8 +59,9 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord> {
 	}
 
 	@Override
-	public void accept(GenericRecord record) {
- 		logger.debug("MailRoom <"+sourceName+"> accept Message "+record);
+	public void accept(ConsumerRecord<Object, Object> data) {
+ 		logger.debug("MailRoom <"+sourceName+"> accept Message "+data);
+ 		GenericRecord record = (GenericRecord)data.value();
 		String externalSystemId = record.get("externalSystemID").toString();
        // BlockingQueue<GenericRecord> reportsQueue = reportsQueues.get(externalSystemId);
         if (reportIds.contains(externalSystemId)) {
@@ -72,14 +74,15 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord> {
            // reportsQueues.put(externalSystemId, queue);
             reportIds.add(externalSystemId);
             String metadata = (String) record.get("metadata");
-            long lastOffset = (long) record.get("lastStateOffset");
-            publishToCreationTopic(externalSystemId, metadata,lastOffset);
+            long lastOffset = data.offset();
+            int partition = data.partition();
+            publishToCreationTopic(externalSystemId, metadata,lastOffset,partition);
         }
 	}
 
-	private void publishToCreationTopic(String externalSystemId, String metadata, long lastOffset) {
+	private void publishToCreationTopic(String externalSystemId, String metadata, long lastOffset, int partition) {
         try {
-            creationQueue.offer(getGenericRecordForCreation(externalSystemId, metadata,lastOffset));
+            creationQueue.offer(getGenericRecordForCreation(externalSystemId, metadata,lastOffset,partition));
         } catch (IOException e) {
             e.printStackTrace();
         } catch (RestClientException e) {
@@ -87,13 +90,16 @@ public class MailRoom implements java.util.function.Consumer<GenericRecord> {
         }
     }
 
-	protected GenericRecord getGenericRecordForCreation(String externalSystemID, String metadata,long lastOffset)
+	protected GenericRecord getGenericRecordForCreation(String externalSystemID, String metadata,long lastOffset,int partition)
             throws IOException, RestClientException {
+		//if(partition > 0 )
+		//	partition--;
 		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
 		        .setSourceName(sourceName)
 		        .setExternalSystemID(externalSystemID)
 		        .setDataOffset(lastOffset)
                 .setMetadata(metadata)
+                .setPartition(partition)
 		        .build();
 
 		return detectionEvent;
