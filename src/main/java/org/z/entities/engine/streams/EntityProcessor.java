@@ -51,13 +51,14 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
     }
 
     @Override
-    public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {
+    public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {  
         try { 
+        	GenericRecord data = (GenericRecord) record.value(); 
         	logger.debug("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
             logger.debug("sons are:");
-            for (SourceDescriptor e: sons.keySet())
-            	logger.debug("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId());
-            GenericRecord data = (GenericRecord) record.value();
+            for (SourceDescriptor e: sons.keySet()) {
+            	logger.debug("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId()); 
+            } 
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
             GenericRecord sonAttributes = convertGeneralAttributes(data,record.offset());

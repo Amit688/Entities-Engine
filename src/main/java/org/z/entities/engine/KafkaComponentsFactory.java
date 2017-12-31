@@ -16,6 +16,7 @@ import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
+import org.apache.log4j.Logger;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -28,6 +29,7 @@ import org.apache.log4j.Logger;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -39,7 +41,9 @@ public class KafkaComponentsFactory {
 	private final boolean sharingSinks;
 	private ActorRef consumerActor;
 	private KafkaProducer<Object, Object> kafkaProducer = null;
+ 
     final static private Logger logger = Logger.getLogger(KafkaComponentsFactory.class);
+ 
 	static {
 		org.z.entities.engine.utils.Utils.setDebugLevel(logger);
 	}
@@ -108,13 +112,12 @@ public class KafkaComponentsFactory {
 	
 	public Source<ConsumerRecord<Object, Object>, ?> getSource(SourceDescriptor descriptor) { 
 		TopicPartition topicPartition = new TopicPartition(descriptor.getSensorId(), descriptor.getPartition());
-		
-		logger.debug("Create source for - "+descriptor);
-		
+ 
+		logger.debug("Create source for new entity  - "+descriptor); 
 		String reportsId = descriptor.getReportsId();
 		return Consumer.plainSource(createConsumerSettings(),
-				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset())) 
-				.filter(record -> filterByReportsId(record, reportsId));
+				(Subscription) Subscriptions.assignmentWithOffset(topicPartition,descriptor.getDataOffset()))
+		 	.filter(record -> filterByReportsId(record, reportsId));
 	}
 
 	/*
@@ -141,7 +144,7 @@ public class KafkaComponentsFactory {
 		return ConsumerSettings.create(system, keyDeserializer,
 				new KafkaAvroDeserializer(schemaRegistry))
         		.withBootstrapServers(kafkaUrl)
-        		.withGroupId("group1")
+        		.withGroupId(UUID.randomUUID().toString())
         		.withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 	}
 
