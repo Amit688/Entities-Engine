@@ -50,7 +50,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
 		Utils.setDebugLevel(logger);
 	}
 
-    public EntitiesSupervisor(LastStatePublisher lastStatePublisher, Map<String, MailRoom> mailRooms,
+    public EntitiesSupervisor(LastStatePublisher lastStatePublisher ,
                               KafkaComponentsFactory componentsFactory, Materializer materializer) {
         this.lastStatePublisher = lastStatePublisher;
     //    this.mailRooms = mailRooms;

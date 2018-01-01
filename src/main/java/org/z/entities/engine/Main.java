@@ -116,21 +116,22 @@ public class Main {
 
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
 
+		/*
 		Map<String,MailRoom> mailRooms = new HashMap<>();
 		StringTokenizer st = new StringTokenizer(System.getenv("INTERFACES_NAME"), ",");
 		while(st.hasMoreElements()){			
 			String sourceName = st.nextToken();
 			mailRooms.put(sourceName,createBackOfficeStream(materializer,componentsFactory,sourceName));
 		}
-
+ */
 		EventBusPublisher lastStatePublisher = new EventBusPublisher();
 		EntitiesSupervisor supervisor = new EntitiesSupervisor(lastStatePublisher,
-				mailRooms, componentsFactory, materializer);
+				 componentsFactory, materializer);
 		LocalEntitiesOperator entitiesOperator = new LocalEntitiesOperator(supervisor);
 		SagasManager sagasManager = new SagasManager();
 		Configuration axonConfiguration = axonSetup(lastStatePublisher, entitiesOperator, sagasManager,componentsFactory);
 
-		createSupervisorStream(materializer, supervisor, mailRooms);
+		createSupervisorStream(materializer, supervisor,componentsFactory);
 		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
 		if(testing) {
 	 		Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory); 
@@ -153,7 +154,7 @@ public class Main {
 		}
 	}
 
-	private static MailRoom createBackOfficeStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, String sourceName) {
+	/*private static MailRoom createBackOfficeStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, String sourceName) {
 		MailRoom mailRoom = new MailRoom(sourceName);
 		sourceFactory.getSource(sourceName)
 	//	.via(Flow.fromFunction(r ->  r.value()))
@@ -161,22 +162,22 @@ public class Main {
 		.run(materializer);
 		return mailRoom;
 	}
-
+*/
 
 	private static void createSupervisorStream(ActorMaterializer materializer,
-			EntitiesSupervisor supervisor,
-			Map<String, MailRoom> mailRooms) {
-		Sink<GenericRecord, ?> sink = MergeHub.of(GenericRecord.class)
-				.via(Flow.fromFunction(record -> new EntitiesEvent(EntitiesEvent.Type.CREATE, record)))
+			EntitiesSupervisor supervisor,KafkaComponentsFactory sourceFactory ) {
+		//Sink<GenericRecord, ?> sink = MergeHub.of(GenericRecord.class)
+				sourceFactory.getSource("create")
+				.via(Flow.fromFunction(record -> new EntitiesEvent(EntitiesEvent.Type.CREATE, (GenericRecord) record.value())))
 				.to(Sink.foreach(supervisor::accept))
 				.run(materializer);
-		for (MailRoom mailRoom : mailRooms.values()) {
+		/*for (MailRoom mailRoom : mailRooms.values()) {
 			SourceQueueWithComplete<GenericRecord> sourceQueue =
 					Source.<GenericRecord>queue(100, OverflowStrategy.backpressure())
 					.to(sink)
 					.run(materializer);
 			mailRoom.setCreationQueue(sourceQueue);
-		}
+		}*/
 	}
 
 	private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 

@@ -105,7 +105,7 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
                // .set("nationality", nationality);
                .set("category", data.get("category"))
                .set("nationality", data.get("nationality"))
-               .set("lastStateOffset", lastStateOffset+1);
+               .set("lastStateOffset", lastStateOffset);
         copyFields(data, builder, Arrays.asList("speed", "elevation", "course", "pictureURL", "height", "nickname", "externalSystemID", "metadata"));
         return builder.build();
     }
