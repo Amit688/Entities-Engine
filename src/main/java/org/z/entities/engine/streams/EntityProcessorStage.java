@@ -63,6 +63,7 @@ public class EntityProcessorStage extends GraphStage<FlowShape<ConsumerRecord<Ob
                     	}
                     	else {
                     		logger.debug("Ignore - " + externalSystemID);
+                    		pull(in);
                     	}
                         
                     }
