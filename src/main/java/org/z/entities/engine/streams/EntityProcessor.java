@@ -12,6 +12,7 @@ import org.z.entities.engine.SourceDescriptor;
 import org.z.entities.engine.utils.Utils;
 import org.z.entities.schema.BasicEntityAttributes;
 import org.z.entities.schema.Category;
+import org.z.entities.schema.DetectionEvent;
 import org.z.entities.schema.EntityFamily;
 import org.z.entities.schema.GeneralEntityAttributes; 
 import org.z.entities.schema.SystemEntity;
@@ -69,12 +70,17 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
             } 
             if(!foundSon) {
             	logger.debug("send to ignore");
-                Schema schema = SchemaBuilder.builder().record("ignore").fields()
-                        .optionalString("externalSystemID")
-                        .endRecord();
-                GenericRecordBuilder builder = new GenericRecordBuilder(schema); 
-                    builder.set("externalSystemID", externalSystemID); 
-            	return new ProducerRecord<>("ignore", uuid.toString(), builder.build());
+            	
+        		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
+        		        .setSourceName("igrnoe")
+        		        .setExternalSystemID(externalSystemID)
+        		        .setDataOffset(0L)
+                        .setMetadata("")
+                        .setPartition(0)
+        		        .build();
+ 
+        		logger.debug("send to ignore"+detectionEvent); 
+            	return new ProducerRecord<>("ignore", uuid.toString(),detectionEvent);
             }
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
