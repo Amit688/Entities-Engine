@@ -51,37 +51,19 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
     public UUID getUuid() {
         return uuid;
     }
+    
+    public Map<SourceDescriptor, GenericRecord> getSons() {
+    	return sons;
+    }
 
     @Override
     public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {  
     	long startTime = System.currentTimeMillis();
         try { 
-        	GenericRecord data = (GenericRecord) record.value(); 
-    		String externalSystemID =  data.get("externalSystemID").toString();
+        	GenericRecord data = (GenericRecord) record.value();  
         	
         	logger.debug("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
-            logger.debug("sons are:");
-            boolean foundSon = false;
-            for (SourceDescriptor e: sons.keySet()) {
-            	logger.debug("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId()); 
-            	if(externalSystemID.equals(e.getReportsId())) {
-            		foundSon = true;
-            	}
-            } 
-            if(!foundSon) {
-            	logger.debug("send to ignore");
-            	
-        		DetectionEvent detectionEvent = DetectionEvent.newBuilder()
-        		        .setSourceName("igrnoe")
-        		        .setExternalSystemID(externalSystemID)
-        		        .setDataOffset(0L)
-                        .setMetadata("")
-                        .setPartition(0)
-        		        .build();
- 
-        		logger.debug("send to ignore"+detectionEvent); 
-            	return new ProducerRecord<>("ignore", uuid.toString(),detectionEvent);
-            }
+            logger.debug("sons are:"); 
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
             GenericRecord sonAttributes = convertGeneralAttributes(data,record.offset());

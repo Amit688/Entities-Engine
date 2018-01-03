@@ -13,6 +13,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.log4j.Logger; 
+import org.z.entities.engine.SourceDescriptor;
 import org.z.entities.engine.utils.Utils;
 
 public class EntityProcessorStage extends GraphStage<FlowShape<ConsumerRecord<Object, Object>, ProducerRecord<Object, Object>>> {
@@ -47,7 +48,23 @@ public class EntityProcessorStage extends GraphStage<FlowShape<ConsumerRecord<Ob
                 setHandler(in, new AbstractInHandler() {
                     @Override
                     public void onPush() throws Exception {
-                        push(out, entityProcessor.apply(grab(in)));
+                    	
+                    	ConsumerRecord<Object, Object> record= grab(in);
+                    	GenericRecord data = (GenericRecord) record.value(); 
+                		String externalSystemID =  data.get("externalSystemID").toString();
+                        boolean foundSon = false;
+                        for (SourceDescriptor e: entityProcessor.getSons().keySet()) {                         
+                        	if(externalSystemID.equals(e.getReportsId())) {
+                        		foundSon = true;
+                        	}
+                        }                 		
+                    	if(foundSon) { 
+                    		push(out, entityProcessor.apply(record));
+                    	}
+                    	else {
+                    		logger.debug("Ignore - " + externalSystemID);
+                    	}
+                        
                     }
                 });
 
