@@ -1,6 +1,7 @@
 package org.z.entities.engine.streams;
 
 import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericRecordBuilder;
@@ -52,13 +53,29 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
 
     @Override
     public ProducerRecord<Object, Object> apply(ConsumerRecord<Object, Object> record) {  
+    	long startTime = System.currentTimeMillis();
         try { 
         	GenericRecord data = (GenericRecord) record.value(); 
+    		String externalSystemID =  data.get("externalSystemID").toString();
+        	
         	logger.debug("processing report for uuid " + uuid + "\nI have " + sons.size() + " sons");
             logger.debug("sons are:");
+            boolean foundSon = false;
             for (SourceDescriptor e: sons.keySet()) {
             	logger.debug("system: " + e.getSystemUUID() + ", Reports ID: " + e.getReportsId() + ",  SensorID" + e.getSensorId()); 
+            	if(externalSystemID.equals(e.getReportsId())) {
+            		foundSon = true;
+            	}
             } 
+            if(!foundSon) {
+            	logger.debug("send to ignore");
+                Schema schema = SchemaBuilder.builder().record("ignore").fields()
+                        .optionalString("externalSystemID")
+                        .endRecord();
+                GenericRecordBuilder builder = new GenericRecordBuilder(schema); 
+                    builder.set("externalSystemID", externalSystemID); 
+            	return new ProducerRecord<>("ignore", uuid.toString(), builder.build());
+            }
             SourceDescriptor sourceDescriptor = getSourceDescriptor(data);
             preferredSource = sourceDescriptor;
             GenericRecord sonAttributes = convertGeneralAttributes(data,record.offset());
@@ -66,6 +83,8 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
             try {
                 ProducerRecord<Object, Object> guiUpdate = generateGuiUpdate();
                 logger.debug("GUI UPDATE:\n" + guiUpdate);
+                long endTime = System.currentTimeMillis() - startTime;
+                logger.debug("END TIME:\n" + endTime);
                 return guiUpdate;
             } catch (RuntimeException e) {
             	logger.debug("failed to generate update");
