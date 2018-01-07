@@ -72,7 +72,7 @@ public class EntityProcessor implements Function<ConsumerRecord<Object, Object>,
                 ProducerRecord<Object, Object> guiUpdate = generateGuiUpdate();
                 logger.debug("GUI UPDATE:\n" + guiUpdate);
                 long endTime = System.currentTimeMillis() - startTime;
-                logger.debug("END TIME:\n" + endTime);
+                logger.error("EntityProcessor took:" + endTime + " ms");
                 return guiUpdate;
             } catch (RuntimeException e) {
             	logger.debug("failed to generate update");
