@@ -154,7 +154,7 @@ public class Main {
 	}
 
 	private static MailRoom createBackOfficeStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, String sourceName) {
-		MailRoom mailRoom = new MailRoom(sourceName, sourceFactory.getKafkaProducer());
+		MailRoom mailRoom = new MailRoom(sourceName);
 		sourceFactory.getSource(sourceName)
 		.via(Flow.fromFunction(r -> (GenericRecord) r.value()))
 		.to(Sink.foreach(mailRoom::accept))
