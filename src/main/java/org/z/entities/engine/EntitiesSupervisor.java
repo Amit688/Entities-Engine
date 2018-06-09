@@ -88,7 +88,7 @@ public class EntitiesSupervisor implements Consumer<EntitiesEvent> {
 				data.get("sourceName").toString(), // Is actually a org.apache.avro.util.Utf8
 				data.get("externalSystemID").toString(),
 				(long)data.get("dataOffset"),
-				UUID.randomUUID());
+				UUID.fromString(data.get("UUID").toString()));
 		logger.debug("creating entity manager stream for source " + sourceDescriptor);
 		String metadata = (String) data.get("metadata");
         createEntity(Arrays.asList(sourceDescriptor), sourceDescriptor.getSystemUUID(), "NONE", metadata);

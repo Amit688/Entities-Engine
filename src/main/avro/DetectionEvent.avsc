@@ -23,6 +23,11 @@
   	"name": "dataOffset",
   	"type": "long",
   	"doc" : "Data Offset"
-	}
+	},
+	{
+    "name": "uuid",
+    "type": "string",
+    "doc" : "UUID for external reference"
+    }
   ]
 }

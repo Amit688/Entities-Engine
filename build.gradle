@@ -60,6 +60,9 @@ dependencies {
 	
 	compile group: 'org.apache.avro', name: 'avro-tools', version: '1.8.2'
 
+	compile group: 'com.hazelcast', name: 'hazelcast', version: '3.10.2'
+
+
 
 	//testCompile 'junit:junit:4.12' 
 	//////testCompile group: 'org.mockito', name: 'mockito-all', version: '1.9.5'
