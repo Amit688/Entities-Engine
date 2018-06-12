@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "namespace" : "org.z.entities.schema",
+  "name": "DetectionEvent",
+  "doc": "This is a schema for entity detection report event",
+  "fields": [
+    {"name": "metadata", 
+  	 "type":"string",
+  	 "doc" : "metadata",
+  	 "default":""
+  	 },
+	{
+  	"name": "sourceName",
+  	"type": "string",
+  	"doc" : "interface name"
+	},
+	{
+  	"name": "externalSystemID",
+  	"type": "string",
+  	"doc" : "external system ID"
+	},
+	{
+  	"name": "dataOffset",
+  	"type": "long",
+  	"doc" : "Data Offset"
+	},
+	{
+    "name": "uuid",
+    "type": "string",
+    "doc" : "UUID for external reference"
+    }
+  ]
+}

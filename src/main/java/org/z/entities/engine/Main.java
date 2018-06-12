@@ -1,92 +1,141 @@
 package org.z.entities.engine;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletionStage;
-
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.generic.GenericRecordBuilder;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
-
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
-
-import akka.Done;
-import akka.NotUsed;
 import akka.actor.ActorSystem;
-import akka.kafka.ProducerSettings;
-import akka.kafka.javadsl.Producer;
 import akka.stream.ActorMaterializer;
 import akka.stream.Materializer;
+import akka.stream.OverflowStrategy;
 import akka.stream.SourceShape;
 import akka.stream.UniformFanInShape;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.GraphDSL;
 import akka.stream.javadsl.GraphDSL.Builder;
 import akka.stream.javadsl.Merge;
+import akka.stream.javadsl.MergeHub;
 import akka.stream.javadsl.Sink;
-import akka.stream.javadsl.Source; 
+import akka.stream.javadsl.Source;
+import akka.stream.javadsl.SourceQueueWithComplete;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import kamon.Kamon;
+
+import org.apache.avro.generic.GenericRecord;
+import org.apache.log4j.Logger;
+import org.axonframework.commandhandling.AsynchronousCommandBus;
+import org.axonframework.config.Configuration;
+import org.axonframework.config.DefaultConfigurer;
+import org.axonframework.config.SagaConfiguration;
+import org.axonframework.eventsourcing.eventstore.inmemory.InMemoryEventStorageEngine; 
+import org.z.entities.engine.sagas.MergeSaga;
+import org.z.entities.engine.sagas.MergeValidationService;
+import org.z.entities.engine.sagas.SagaCommandsHandler;
+import org.z.entities.engine.sagas.SagasManager;
+import org.z.entities.engine.sagas.SplitSaga;
+import org.z.entities.engine.sagas.SplitValidationService;
+import org.z.entities.engine.streams.EventBusPublisher;
+import org.z.entities.engine.streams.LocalEntitiesOperator;
+import org.z.entities.engine.utils.Utils;
+import org.z.entities.schema.BasicEntityAttributes;
+import org.z.entities.schema.DetectionEvent;
+import org.z.entities.schema.EntityFamily;
+import org.z.entities.schema.GeneralEntityAttributes;
+import org.z.entities.schema.MergeEvent;
+import org.z.entities.schema.SplitEvent;
+import org.z.entities.schema.SystemEntity;
+
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.UUID;
+
 /**
  * Created by Amit on 20/03/2017.
  */
 public class Main {
 
+	public static boolean testing = false;
+	final static public Logger logger = Logger.getLogger(Main.class);
+	static {
+		Utils.setDebugLevel(logger);
+	}
+
 	public static void main(String[] args) throws InterruptedException, IOException, RestClientException {
-		System.out.println("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
-		System.out.println("SCHEMA_REGISTRY_ADDRESS::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
-		System.out.println("SCHEMA_REGISTRY_IDENTITY::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
-		System.out.println("SINGLE_SOURCE_PER_TOPIC::::::::" + System.getenv("SINGLE_SOURCE_PER_TOPIC"));
-		System.out.println("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
-		System.out.println("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
-		System.out.println("CONF_IND::::::::" + System.getenv("CONF_IND"));
+		logger.debug("KAFKA_ADDRESS::::::::" + System.getenv("KAFKA_ADDRESS"));
+		logger.debug("SCHEMA_REGISTRY_ADDRESS::::::::" + System.getenv("SCHEMA_REGISTRY_ADDRESS"));
+		logger.debug("SCHEMA_REGISTRY_IDENTITY::::::::" + System.getenv("SCHEMA_REGISTRY_IDENTITY"));
+		logger.debug("SINGLE_SOURCE_PER_TOPIC::::::::" + System.getenv("SINGLE_SOURCE_PER_TOPIC"));
+		logger.debug("SINGLE_SINK::::::::" + System.getenv("SINGLE_SINK"));
+		logger.debug("KAMON_ENABLED::::::::" + System.getenv("KAMON_ENABLED"));
+		logger.debug("CONF_IND::::::::" + System.getenv("CONF_IND"));
+		logger.debug("INTERFACES_NAME::::::::" + System.getenv("INTERFACES_NAME"));
+		logger.debug("DEBUG_LEVEL::::::::" + System.getenv("DEBUG_LEVEL"));
+		logger.debug("AKKA_THREAD_POOL_SIZE::::::::" + System.getenv("AKKA_THREAD_POOL_SIZE"));
 
 		boolean isKamonEnabled = Boolean.parseBoolean(System.getenv("KAMON_ENABLED"));
+		final ActorSystem system; 
+		final SchemaRegistryClient schemaRegistry;
+		final KafkaComponentsFactory componentsFactory;
 
-		final ActorSystem system;
-		
-		if(System.getenv("CONF_IND").equalsIgnoreCase("true")) {
-	        	Config cfg = ConfigFactory.parseResources(Main.class, "/akka-streams.conf").resolve();
-	       		 system = ActorSystem.create("sys", cfg);	
+		if(!testing) { 
+			int akkaThreadPoolSize = Integer.parseInt(System.getenv("AKKA_THREAD_POOL_SIZE"));
+			if(akkaThreadPoolSize > 0) 
+			{ 
+				Config customConf = ConfigFactory.parseString(getAkkaConfig(akkaThreadPoolSize));
+				logger.debug("Custom config is : "+customConf.toString());
+				system = ActorSystem.create("sys", customConf);
+			}
+			else {
+				system = ActorSystem.create();
+			}
+			schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
+			componentsFactory = new KafkaComponentsFactory(system, schemaRegistry,
+					System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
+					Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
+
+			if (isKamonEnabled) {
+				Kamon.start();
+			}
+
 		}
 		else {
+			System.setOut(new PrintStream(new FileOutputStream("/home/badhat/workspace/EnginePerformanceProcess/output.txt")));
 			system = ActorSystem.create();
+			schemaRegistry = new MockSchemaRegistryClient();
+			registerSchemas(schemaRegistry);
+			componentsFactory = new KafkaComponentsFactory(system, schemaRegistry,
+					System.getenv("KAFKA_ADDRESS"), false,true);
 		}
+
 		final ActorMaterializer materializer = ActorMaterializer.create(system);
-		final SchemaRegistryClient schemaRegistry = new CachedSchemaRegistryClient(System.getenv("SCHEMA_REGISTRY_ADDRESS"), Integer.parseInt(System.getenv("SCHEMA_REGISTRY_IDENTITY")));
-		final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-				System.getenv("KAFKA_ADDRESS"), Boolean.parseBoolean(System.getenv("SINGLE_SOURCE_PER_TOPIC")),
-				Boolean.parseBoolean(System.getenv("SINGLE_SINK")));
 
-		if (isKamonEnabled) {
-			Kamon.start();
+		Map<String,MailRoom> mailRooms = new HashMap<>();
+		StringTokenizer st = new StringTokenizer(System.getenv("INTERFACES_NAME"), ",");
+		while(st.hasMoreElements()){			
+			String sourceName = st.nextToken();
+			mailRooms.put(sourceName,createBackOfficeStream(materializer,componentsFactory,sourceName));
 		}
 
-		/* To run local via eclipse
+		EventBusPublisher lastStatePublisher = new EventBusPublisher();
+		EntitiesSupervisor supervisor = new EntitiesSupervisor(lastStatePublisher,
+				mailRooms, componentsFactory, materializer);
+		LocalEntitiesOperator entitiesOperator = new LocalEntitiesOperator(supervisor);
+		SagasManager sagasManager = new SagasManager();
+		Configuration axonConfiguration = axonSetup(lastStatePublisher, entitiesOperator, sagasManager);
 
-		final ActorSystem system = ActorSystem.create();
-        final ActorMaterializer materializer = ActorMaterializer.create(system);
-        final SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-        registerSchemas(schemaRegistry);
-        final KafkaComponentsFactory sourceFactory = new KafkaComponentsFactory(system, schemaRegistry,
-                        "192.168.0.51:9092", false,false);
-
-		 */
-
-		EntitiesSupervisor supervisor = createSupervisorStream(materializer, sourceFactory);
-		//writeSomeData(system, materializer, schemaRegistry,supervisor);
+		createSupervisorStream(materializer, supervisor, mailRooms);
+		createSagasManagerStream(materializer, componentsFactory, sagasManager); 
+		if(testing) {
+			Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory); 
+			simulateMergeAndSplit(system, materializer, schemaRegistry, supervisor, sagasManager, componentsFactory);
+		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -94,32 +143,40 @@ public class Main {
 				if (isKamonEnabled) {
 					Kamon.shutdown();
 				}
+				axonConfiguration.shutdown();
 			}
 		});
-		System.out.println("Ready");
+
+		logger.debug("Ready");
 		while(true) {
 			Thread.sleep(3000);
 		}
 	}
 
-	private static EntitiesSupervisor createSupervisorStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory) {
-		Source<EntitiesEvent, ?> detectionsSource = createSourceWithType(sourceFactory, "creation", EntitiesEvent.Type.CREATE);
-		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
-		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
-		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
-			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(3));
-			directToMerger(builder, detectionsSource, merger);
-			directToMerger(builder, mergesSource, merger);
-			directToMerger(builder, splitsSource, merger);
-			return SourceShape.of(merger.out());
-		}));
-
-		EntitiesSupervisor supervisor = new EntitiesSupervisor(materializer, sourceFactory);
-		combinedSource
-		.to(Sink.foreach(supervisor::accept))
+	private static MailRoom createBackOfficeStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory, String sourceName) {
+		MailRoom mailRoom = new MailRoom(sourceName);
+		sourceFactory.getSource(sourceName)
+		.via(Flow.fromFunction(r -> (GenericRecord) r.value()))
+		.to(Sink.foreach(mailRoom::accept))
 		.run(materializer);
+		return mailRoom;
+	}
 
-		return supervisor;
+
+	private static void createSupervisorStream(ActorMaterializer materializer,
+			EntitiesSupervisor supervisor,
+			Map<String, MailRoom> mailRooms) {
+		Sink<GenericRecord, ?> sink = MergeHub.of(GenericRecord.class)
+				.via(Flow.fromFunction(record -> new EntitiesEvent(EntitiesEvent.Type.CREATE, record)))
+				.to(Sink.foreach(supervisor::accept))
+				.run(materializer);
+		for (MailRoom mailRoom : mailRooms.values()) {
+			SourceQueueWithComplete<GenericRecord> sourceQueue =
+					Source.<GenericRecord>queue(100, OverflowStrategy.backpressure())
+					.to(sink)
+					.run(materializer);
+			mailRoom.setCreationQueue(sourceQueue);
+		}
 	}
 
 	private static Source<EntitiesEvent, ?> createSourceWithType(KafkaComponentsFactory sourceFactory, 
@@ -128,341 +185,145 @@ public class Main {
 				.via(Flow.fromFunction(r -> new EntitiesEvent(type, (GenericRecord) r.value())));
 	}
 
-	private static void directToMerger(Builder<NotUsed> builder, 
+	private static void directToMerger(Builder<?> builder,
 			Source<EntitiesEvent, ?> source, UniformFanInShape<EntitiesEvent, ?> merger) {
 		builder.from(builder.add(source).out()).toFanIn(merger);
 	}
 
-	private static void writeSomeData(ActorSystem system, Materializer materializer, 
-			SchemaRegistryClient schemaRegistry, EntitiesSupervisor supervisor) throws IOException, RestClientException {
-		ProducerSettings<String, Object> producerSettings = ProducerSettings
-				.create(system, new StringSerializer(), new KafkaAvroSerializer(schemaRegistry))
-				.withBootstrapServers("192.168.0.51:9092");
-		Sink<ProducerRecord<String, Object>, CompletionStage<Done>> sink = Producer.plainSink(producerSettings);
-
-		Schema creationSchema = getSchema(schemaRegistry, "detectionEvent");
-		GenericRecord creationRecord = new GenericRecordBuilder(creationSchema)
-		.set("sourceName", "source1")
-		.set("externalSystemID", "id1")
-		.build();
-		ProducerRecord<String, Object> producerRecord = new ProducerRecord<String, Object>("creation", creationRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		GenericRecord creationRecord2 = new GenericRecordBuilder(creationSchema)
-		.set("sourceName", "source2")
-		.set("externalSystemID", "id1")
-		.build();
-		producerRecord = new ProducerRecord<String, Object>("creation", creationRecord2);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		Schema basicAttributesSchema = getSchema(schemaRegistry, "basicEntityAttributes");
-		Schema coordinateSchema = basicAttributesSchema.getField("coordinate").schema();
-		GenericRecord coordinate = new GenericRecordBuilder(coordinateSchema)
-		.set("lat", 4.5d)
-		.set("long", 3.4d)
-		.build();
-		GenericRecord basicAttributes = new GenericRecordBuilder(basicAttributesSchema)
-		.set("coordinate", coordinate)
-		.set("isNotTracked", false)
-		.set("entityOffset", 50l)
-		.set("sourceName", "source1")
-		.build();
-		Schema dataSchema = getSchema(schemaRegistry, "generalEntityAttributes");
-		Schema nationalitySchema = dataSchema.getField("nationality").schema();
-		Schema categorySchema = dataSchema.getField("category").schema();
-		GenericRecord dataRecord = new GenericRecordBuilder(dataSchema)
-		.set("basicAttributes", basicAttributes)
-		.set("speed", 4.7)
-		.set("elevation", 7.8)
-		.set("course", 8.3)
-		.set("nationality", new GenericData.EnumSymbol(nationalitySchema, "USA"))
-		.set("category", new GenericData.EnumSymbol(categorySchema, "boat"))
-		.set("pictureURL", "huh?")
-		.set("height", 6.1)
-		.set("nickname", "rerere")
-		.set("externalSystemID", "id1")
-		.build();
-		ProducerRecord<String, Object> producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		producerRecord2 = new ProducerRecord<String, Object>("source2", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-
-		Set<UUID> uuidSet = supervisor.getStreams().keySet();
-		UUID[] array = uuidSet.stream().toArray(UUID[]::new);
-
-		Schema mergeSchema = getSchema(schemaRegistry, "mergeEvent");
-		GenericRecord mergeRecord = new GenericRecordBuilder(mergeSchema)
-		//.set("mergedEntitiesId", Arrays.asList("38400000-8cf0-11bd-b23f-0b96e4ef00e1",
-		//		"38400000-8cf0-11bd-b23f-0b96e4ef00e2"))
-		.set("mergedEntitiesId", Arrays.asList(array[0].toString(), array[1].toString()))
-		.build();
-		producerRecord = new ProducerRecord<String, Object>("merge", mergeRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-
-		uuidSet = supervisor.getStreams().keySet();
-		array = uuidSet.stream().toArray(UUID[]::new);
-
-		Schema splitSchema = getSchema(schemaRegistry, "splitEvent");
-		GenericRecord splitRecord = new GenericRecordBuilder(splitSchema)
-		//.set("splittedEntityID", "38400000-8cf0-11bd-b23f-0b96e4ef00e1")
-		.set("splittedEntityID", array[0].toString())
-		.build();
-		producerRecord = new ProducerRecord<String, Object>("split", splitRecord);
-		Source.from(Arrays.asList(producerRecord))
-		.to(sink)
-		.run(materializer);
-
-		try {
-			Thread.sleep(5000);
-		} catch (Exception e) {
-
-		}
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-		producerRecord2 = new ProducerRecord<String, Object>("source1", dataRecord);
-
-		Source.from(Arrays.asList(producerRecord2))
-		.to(sink)
-		.run(materializer);
-
-	}
-
-	private static Schema getSchema(SchemaRegistryClient schemaRegistry, String name) throws IOException, RestClientException {
-		int id = schemaRegistry.getLatestSchemaMetadata(name).getId();
-		return schemaRegistry.getByID(id);
-	}
-
-	private static SchemaRegistryClient initializeSchemaRegistry() {
-		Schema.Parser parser = new Schema.Parser();
-		try {
-			SchemaRegistryClient schemaRegistry = new MockSchemaRegistryClient();
-			schemaRegistry.register("detectionEvent", 
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"detectionEvent\", "
-							+ "\"doc\": \"This is a schema for entity detection report event\", " 
-							+ "\"fields\": ["
-							+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, " 
-							+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
-							+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
-							+ "]}"));
-			schemaRegistry.register("mergeEvent",
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"mergeEvent\", "
-							+ "\"doc\": \"This is a schema for merge entities event\", "
-							+ "\"fields\": ["
-							+ "{ \"name\": \"mergedEntitiesId\", \"type\":\n" +
-							"    \t{\n" +
-							"      \t\"type\": \"array\",\n" +
-							"      \t\"items\": {\n" +
-							"      \t\"name\": \"entityId\",\n" +
-							"      \t\"type\": \"string\"\n" +
-							"      \t}\n" +
-							"  \t}}"
-							+ "]}"));
-			schemaRegistry.register("splitEvent",
-					parser.parse("{\n" +
-							"  \"type\": \"record\",\n" +
-							"  \"name\": \"splitEvent\",\n" +
-							"  \"fields\": [\n" +
-							"\t{\n" +
-							"  \t\"name\": \"splittedEntityID\",\n" +
-							"  \t\"type\": \"string\"\n" +
-							"\t}\n" +
-							" ] \n" +
-							"}"));
-			schemaRegistry.register("basicEntityAttributes", 
-					parser.parse("{\"type\": \"record\","
-							+ "\"name\": \"basicEntityAttributes\","
-							+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
-							+ "\"fields\": ["
-							+ "{\"name\": \"coordinate\", \"type\":"
-							+ "{\"type\": \"record\","
-							+ "\"name\": \"coordinate\","
-							+ "\"doc\": \"Location attribute in grid format\","
-							+ "\"fields\": ["
-							+ "{\"name\": \"lat\",\"type\": \"double\"},"
-							+ "{\"name\": \"long\",\"type\": \"double\"}"
-							+ "]}},"
-							+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
-							+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
-							+ "{\"name\": \"sourceName\", \"type\": \"string\"}"		    						
-							+ "]}"));
-			schemaRegistry.register("generalEntityAttributes", 
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"generalEntityAttributes\","
-							+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
-							+ "\"fields\": ["
-							+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
-							+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
-							+ "{\"name\": \"elevation\",\"type\": \"double\"},"
-							+ "{\"name\": \"course\",\"type\": \"double\"},"
-							+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
-							+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
-							+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
-							+ "{\"name\": \"height\",\"type\": \"double\"},"
-							+ "{\"name\": \"nickname\",\"type\": \"string\"},"
-							+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
-							+ "]}"));
-			schemaRegistry.register("systemEntity", 
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"systemEntity\","
-							+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
-							+ "\"fields\": ["
-							+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
-							+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
-							+ "]}"));
-			schemaRegistry.register("entityFamily", 
-					parser.parse("{\"type\": \"record\", "
-							+ "\"name\": \"entityFamily\", "
-							+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
-							+ "\"fields\": ["
-							+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-							+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
-							+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
-							+ "]}"));
-			return schemaRegistry;
-		} catch (RestClientException | IOException e) {
-			throw new ExceptionInInitializerError(e);
-		}
-	}
-
 	private static void registerSchemas(SchemaRegistryClient schemaRegistry) throws IOException, RestClientException {
-		Schema.Parser parser = new Schema.Parser();
-		schemaRegistry.register("detectionEvent",
-				parser.parse("{\"type\": \"record\", "
-						+ "\"name\": \"detectionEvent\", "
-						+ "\"doc\": \"This is a schema for entity detection report event\", "
-						+ "\"fields\": ["
-						+ "{ \"name\": \"sourceName\", \"type\": \"string\", \"doc\" : \"interface name\" }, "
-						+ "{ \"name\": \"externalSystemID\", \"type\": \"string\", \"doc\":\"external system ID\"},"
-						+ "{ \"name\": \"dataOffset\", \"type\": \"long\", \"doc\":\"Data Offset\"}"
-						+ "]}"));
-		schemaRegistry.register("basicEntityAttributes",
-				parser.parse("{\"type\": \"record\","
-						+ "\"name\": \"basicEntityAttributes\","
-						+ "\"doc\": \"This is a schema for basic entity attributes, this will represent basic entity in all life cycle\","
-						+ "\"fields\": ["
-						+ "{\"name\": \"coordinate\", \"type\":"
-						+ "{\"type\": \"record\","
-						+ "\"name\": \"coordinate\","
-						+ "\"doc\": \"Location attribute in grid format\","
-						+ "\"fields\": ["
-						+ "{\"name\": \"lat\",\"type\": \"double\"},"
-						+ "{\"name\": \"long\",\"type\": \"double\"}"
-						+ "]}},"
-						+ "{\"name\": \"isNotTracked\",\"type\": \"boolean\"},"
-						+ "{\"name\": \"entityOffset\",\"type\": \"long\"},"
-						+ "{\"name\": \"sourceName\", \"type\": \"string\"}"	
-						+ "]}"));
-		schemaRegistry.register("generalEntityAttributes",
-				parser.parse("{\"type\": \"record\", "
-						+ "\"name\": \"generalEntityAttributes\","
-						+ "\"doc\": \"This is a schema for general entity before acquiring by the system\","
-						+ "\"fields\": ["
-						+ "{\"name\": \"basicAttributes\",\"type\": \"basicEntityAttributes\"},"
-						+ "{\"name\": \"speed\",\"type\": \"double\",\"doc\" : \"This is the magnitude of the entity's velcity vector.\"},"
-						+ "{\"name\": \"elevation\",\"type\": \"double\"},"
-						+ "{\"name\": \"course\",\"type\": \"double\"},"
-						+ "{\"name\": \"nationality\",\"type\": {\"name\": \"nationality\", \"type\": \"enum\",\"symbols\" : [\"ISRAEL\", \"USA\", \"SPAIN\"]}},"
-						+ "{\"name\": \"category\",\"type\": {\"name\": \"category\", \"type\": \"enum\",\"symbols\" : [\"airplane\", \"boat\"]}},"
-						+ "{\"name\": \"pictureURL\",\"type\": \"string\"},"
-						+ "{\"name\": \"height\",\"type\": \"double\"},"
-						+ "{\"name\": \"nickname\",\"type\": \"string\"},"
-						+ "{\"name\": \"externalSystemID\",\"type\": \"string\",\"doc\" : \"This is ID given be external system.\"}"
-						+ "]}"));
-		schemaRegistry.register("systemEntity", 
-				parser.parse("{\"type\": \"record\", "
-						+ "\"name\": \"systemEntity\","
-						+ "\"doc\": \"This is a schema of a single processed entity with all attributes.\","
-						+ "\"fields\": ["
-						+ "{\"name\": \"entityID\", \"type\": \"string\"}, "
-						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"}"
-						+ "]}"));
-		schemaRegistry.register("entityFamily", 
-				parser.parse("{\"type\": \"record\", "
-						+ "\"name\": \"entityFamily\", "
-						+ "\"doc\": \"This is a schema of processed entity with full attributes.\","
-						+ "\"fields\": ["
-						+ "{\"name\": \"entityID\", \"type\": \"string\"},"
-						+ "{\"name\": \"entityAttributes\", \"type\": \"generalEntityAttributes\"},"
-						+ "{\"name\" : \"sons\", \"type\": [{\"type\": \"array\", \"items\": \"systemEntity\"}]}"
-						+ "]}"));
 
-		schemaRegistry.register("mergeEvent",
-				parser.parse("{\"type\": \"record\", "
-						+ "\"name\": \"mergeEvent\", "
-						+ "\"doc\": \"This is a schema for merge entities event\", "
-						+ "\"fields\": ["
-						+ "{ \"name\": \"mergedEntitiesId\", \"type\":\n" +
-						"    \t{\n" +
-						"      \t\"type\": \"array\",\n" +
-						"      \t\"items\": {\n" +
-						"      \t\"name\": \"entityId\",\n" +
-						"      \t\"type\": \"string\"\n" +
-						"      \t}\n" +
-						"  \t}}"
-						+ "]}"));
+		schemaRegistry.register("DetectionEvent",DetectionEvent.SCHEMA$);
+		schemaRegistry.register("BasicEntityAttributes",BasicEntityAttributes.SCHEMA$);
+		schemaRegistry.register("GeneralEntityAttributes",GeneralEntityAttributes.SCHEMA$);
+		schemaRegistry.register("SystemEntity",SystemEntity.SCHEMA$);
+		schemaRegistry.register("EntityFamily",EntityFamily.SCHEMA$);
+		schemaRegistry.register("MergeEvent",MergeEvent.SCHEMA$);
+		schemaRegistry.register("SplitEvent",SplitEvent.SCHEMA$); 
+	}
 
-		schemaRegistry.register("splitEvent",
-				parser.parse("{\n" +
-						"  \"type\": \"record\",\n" +
-						"  \"name\": \"splitEvent\",\n" +
-						"  \"fields\": [\n" +
-						"\t{\n" +
-						"  \t\"name\": \"splittedEntityID\",\n" +
-						"  \t\"type\": \"string\"\n" +
-						"\t}\n" +
-						" ] \n" +
-						"}"));
+	private static Configuration axonSetup(EventBusPublisher eventBusPublisher, LocalEntitiesOperator entitiesOperator,
+			SagasManager sagasManager) {
+		Configuration configuration = DefaultConfigurer.defaultConfiguration()
+				.configureCommandBus(c -> {
+					AsynchronousCommandBus commandBus = new AsynchronousCommandBus();
+					c.onShutdown(commandBus::shutdown);
+					return commandBus;
+				})
+				.configureEmbeddedEventStore(c -> new InMemoryEventStorageEngine())
+				.registerCommandHandler(c -> new SagaCommandsHandler(entitiesOperator, c.eventBus()))
+				.registerCommandHandler(c -> sagasManager)
+				.registerModule(SagaConfiguration.subscribingSagaManager(MergeSaga.class))
+				.registerModule(SagaConfiguration.subscribingSagaManager(SplitSaga.class))
+				.registerComponent(MergeValidationService.class, c -> new MergeValidationService())
+				.registerComponent(SplitValidationService.class, c-> new SplitValidationService())
+				.buildConfiguration();
+		configuration.start();
+
+		eventBusPublisher.setEventBus(configuration.eventBus());
+		sagasManager.setEventBus(configuration.eventBus());
+
+		return configuration;
+	}
+
+	private static void createSagasManagerStream(ActorMaterializer materializer, KafkaComponentsFactory sourceFactory,
+			SagasManager sagasManager) {
+		Source<EntitiesEvent, ?> mergesSource = createSourceWithType(sourceFactory, "merge", EntitiesEvent.Type.MERGE);
+		Source<EntitiesEvent, ?> splitsSource = createSourceWithType(sourceFactory, "split", EntitiesEvent.Type.SPLIT);
+		Source<EntitiesEvent, ?> combinedSource = Source.fromGraph(GraphDSL.create(builder -> {
+			UniformFanInShape<EntitiesEvent, EntitiesEvent> merger = builder.add(Merge.create(2));
+			directToMerger(builder, mergesSource, merger);
+			directToMerger(builder, splitsSource, merger);
+			return SourceShape.of(merger.out());
+		}));
+
+		combinedSource
+		.to(Sink.foreach(sagasManager::accept))
+		.run(materializer);
+	}
+
+	private static void simulateMergeAndSplit(ActorSystem system, Materializer materializer, SchemaRegistryClient schemaRegistry,
+			EntitiesSupervisor supervisor, SagasManager sagasManager, KafkaComponentsFactory componentsFactory)
+					throws InterruptedException, IOException, RestClientException{
+		Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
+		printCurrentUuids(supervisor);
+		printOccupiedUuids(sagasManager);
+
+		Simulator.writeMerge(system, materializer, schemaRegistry, supervisor.getAllUuids());
+		logger.debug("Started merge saga");
+		printOccupiedUuids(sagasManager);
+		Thread.sleep(2000);
+		printCurrentUuids(supervisor);
+		printOccupiedUuids(sagasManager);
+
+		//        Simulator.writeSplit(system, materializer, schemaRegistry,
+		//                supervisor.getAllUuids().iterator().next());
+		//        logger.debug("Started split saga");
+		//        printOccupiedUuids(sagasManager);
+		//        Thread.sleep(2000);
+		//        printCurrentUuids(supervisor);
+		//        printOccupiedUuids(sagasManager);
+		//
+		//        Simulator.writeSomeDataForMailRoom(system, materializer, schemaRegistry, componentsFactory);
+
+		//		Thread.sleep(2000);
+		//		Set<UUID> entities = supervisor.getAllUuids();
+		//		for(UUID uuid : entities) {
+		//			supervisor.stopEntity(uuid, null);
+		//		}
+
+	}
+
+	private static void printCurrentUuids(EntitiesSupervisor supervisor) {
+		Set<UUID> uuids = supervisor.getAllUuids();
+		System.out.print("current uuids: ");
+		uuids.forEach(uuid -> System.out.print(uuid + ", "));
+		logger.debug("\n");
+	}
+
+	private static void printOccupiedUuids(SagasManager sagasManager) {
+		Set<UUID> uuids = sagasManager.getOccupiedEntities();
+		System.out.print("occupied entities are: ");
+		uuids.forEach(uuid -> System.out.print(uuid + ", "));
+		logger.debug("\n");
+	}
+	
+
+	private static String getAkkaConfig(int akkaThreadPoolSize) {
+		
+		return "{\"akka\": {" +
+				"\"log-config-on-start\" : \"on\","+				
+			"\"actor\": {" +
+				"\"default-blocking-io-dispatcher\": {"+
+					"\"executor\": \"thread-pool-executor\","+
+					"\"thread-pool-executor\": {"+
+						"\"fixed-pool-size\": "+akkaThreadPoolSize+
+					"},"+
+					"\"throughput\": 1,"+
+					"\"type\": \"Dispatcher\"},"+
+				"\"default-dispatcher\": {"+
+					"\"attempt-teamwork\": \"on\","+
+					"\"default-executor\": {"+
+						"\"fallback\": \"fork-join-executor\""+
+					"},"+
+					"\"executor\": \"default-executor\","+
+					"\"fork-join-executor\": {"+
+					"	\"parallelism-factor\": 32,"+
+					"	\"parallelism-max\": "+akkaThreadPoolSize+","+
+					"	\"parallelism-min\": 16,"+
+					"	\"task-peeking-mode\": \"FIFO\""+
+					"},"+
+					"\"thread-pool-executor\": {"+
+				"		\"allow-core-timeout\": \"on\","+
+				"		\"core-pool-size-factor\": 3,"+
+				"		\"core-pool-size-max\": "+akkaThreadPoolSize+","+
+				"		\"core-pool-size-min\": 8,"+
+				"		\"fixed-pool-size\": \"off\","+
+				"		\"keep-alive-time\": \"60s\","+
+				"		\"max-pool-size-factor\": 3,"+
+				"		\"max-pool-size-max\": "+akkaThreadPoolSize+","+
+				"		\"max-pool-size-min\": 8,"+
+				"		\"task-queue-size\": -1,"+
+				"		\"task-queue-type\": \"linked\""+
+				"	} }	}} }";
 	}
 }

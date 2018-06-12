@@ -7,6 +7,12 @@
  * user guide available at https://docs.gradle.org/2.14.1/userguide/tutorial_java_projects.html
  */
 
+
+plugins {
+  id "com.commercehub.gradle.plugin.avro" version "0.9.0"
+}
+
+
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
@@ -28,27 +34,51 @@ dependencies {
 
 */
 
-    compile group: 'com.typesafe.akka', name: 'akka-actor_2.12', version: '2.5.3'
-    compile group: 'com.typesafe.akka', name: 'akka-stream_2.12', version: '2.5.3'
+    compile group: 'com.typesafe.akka', name: 'akka-actor_2.12', version: '2.5.4'
+    compile group: 'com.typesafe.akka', name: 'akka-stream_2.12', version: '2.5.4'
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: '0.10.2.1'
     compile group: 'org.apache.kafka', name: 'kafka-streams', version: '0.10.2.1'
     compile group: "com.typesafe.akka", name: "akka-stream-kafka_2.12", version: '0.16'
 
+    // Avro
 	compile "org.apache.avro:avro:1.8.1"
 	compile "io.confluent:kafka-avro-serializer:3.2.0"
 	compile "io.confluent:kafka-schema-registry:3.2.0"
 	compile "io.confluent:common:3.2.0"
 
 	// Kamon
-	compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10'
-	compile group: 'io.kamon', name: 'kamon-system-metrics_2.11', version: '0.6.3'
-	compile group: 'io.kamon', name: 'kamon-akka-2.4_2.11', version: '0.6.6'
-	compile group: 'io.kamon', name: 'kamon-jmx_2.11', version: '0.6.6'
-	compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.21'
+    compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10'
 
-	testCompile 'junit:junit:4.12'
+    // Axon
+    compile 'org.axonframework:axon-core:3.0.5'
+    compile group: 'javax.inject', name: 'javax.inject', version: '1'
+	compile group: 'org.aspectj', name: 'aspectjweaver', version: '1.8.10' 
+	compile group: 'io.kamon', name: 'kamon-system-metrics_2.12', version: '0.6.7' 
+	compile group: 'io.kamon', name: 'kamon-akka-2.4_2.12', version: '0.6.8' 
+	compile group: 'io.kamon', name: 'kamon-jmx_2.12', version: '0.6.7'
+	compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.21'
+	
+	compile group: 'org.apache.avro', name: 'avro-tools', version: '1.8.2'
+
+	compile group: 'com.hazelcast', name: 'hazelcast', version: '3.10.2'
+
+
+
+	//testCompile 'junit:junit:4.12' 
+	//////testCompile group: 'org.mockito', name: 'mockito-all', version: '1.9.5'
+	//testCompile "org.powermock:powermock-mockito-release-full:1.6.1"
+	//testCompile group: 'org.mockito', name: 'mockito-core', version: '1.10.19'
+	//testCompile group: 'org.powermock', name: 'powermock-mockito', version: '1.7.1'
+	//testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '1.7.1'
+	
+	testCompile fileTree(dir: '/home/badhat/powermock-mockito-junit-1.7.1', include: '*.jar')
+	
 }
 
+avro {
+    createSetters = true
+    fieldVisibility = "PRIVATE"
+}
 
 
 mainClassName = 'org.z.entities.engine.Main'

@@ -1,0 +1,16 @@
+{"type": "record",  
+ "name": "GeneralEntityAttributes",
+ "namespace" : "org.z.entities.schema",
+ "doc": "This is a schema for general entity before acquiring by the system,",
+ "fields": 
+         [{"name": "metadata", "type":"string", "default":""},
+          {"name": "basicAttributes","type": "BasicEntityAttributes"},
+		  {"name": "speed","type": "double","doc" : "This is the magnitude of the entity's velcity vector."},
+		  {"name": "elevation","type": "double"},
+		  {"name": "course","type": "double"},
+		  {"name": "nationality","type": {"name": "Nationality", "type": "enum","symbols" : ["ISRAEL", "USA", "SPAIN"]}},
+	  	  {"name": "category","type": {"name": "Category", "type": "enum","symbols" : ["airplane", "boat"]}},
+		  {"name": "pictureURL","type": "string"},
+		  {"name": "height","type": "double"},
+		  {"name": "nickname","type": "string"},
+		  {"name": "externalSystemID","type": "string","doc" : "This is ID given be external system."}]}

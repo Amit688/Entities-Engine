@@ -21,6 +21,7 @@ public class EntitiesEvent {
 	
 	public static enum Type {
 		CREATE,
+		STOP,
 		MERGE,
 		SPLIT
 	}

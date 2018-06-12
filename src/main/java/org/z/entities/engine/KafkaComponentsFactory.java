@@ -1,28 +1,13 @@
 package org.z.entities.engine;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.CompletionStage;
-
-import akka.actor.ActorRef;
-import akka.kafka.*;
-
-import org.apache.avro.generic.GenericRecord;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
-
 import akka.Done;
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import akka.kafka.ConsumerSettings;
+import akka.kafka.KafkaConsumerActor;
+import akka.kafka.ProducerSettings;
+import akka.kafka.Subscription;
+import akka.kafka.Subscriptions;
 import akka.kafka.javadsl.Consumer;
 import akka.kafka.javadsl.Producer;
 import akka.stream.javadsl.Sink;
@@ -30,6 +15,16 @@ import akka.stream.javadsl.Source;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
+
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class KafkaComponentsFactory {
 	private ActorSystem system;
@@ -59,7 +54,6 @@ public class KafkaComponentsFactory {
 	/**
 	 * Creates a source that filters its messages by a reportId
 	 *
-	 * @param system
 	 * @param topic
 	 * @param reportsId
 	 * @return
@@ -76,7 +70,6 @@ public class KafkaComponentsFactory {
 	/**
 	 * Creates a source from a source descriptor
 	 *
-	 * @param system
 	 * @param descriptor
 	 * @return
 	 */
@@ -98,8 +91,7 @@ public class KafkaComponentsFactory {
 		if (sharingSources) {
 			return Consumer.plainExternalSource(consumerActor,
 					Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
-		} else {
-			System.out.println("Topic "+topic+" offset "+offset);
+		} else { 
 			return Consumer.plainSource(createConsumerSettings(),
 					(Subscription) Subscriptions.assignmentWithOffset(getTopicPartition(topic), offset));
 		}
@@ -108,7 +100,11 @@ public class KafkaComponentsFactory {
 	private ConsumerSettings<Object, Object> createConsumerSettings() {
 		KafkaAvroDeserializer keyDeserializer = new KafkaAvroDeserializer(schemaRegistry);
 		
-		keyDeserializer.configure(Collections.singletonMap("schema.registry.url", "http://fake-url"), true);
+		Map<String,String> map = new ConcurrentHashMap<String, String>();				
+		map.put("schema.registry.url", "http://fake-url");
+		map.put("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE)); 
+		keyDeserializer.configure(map, true);
+		
 		return ConsumerSettings.create(system, keyDeserializer,
 				new KafkaAvroDeserializer(schemaRegistry))
         		.withBootstrapServers(kafkaUrl)
@@ -131,10 +127,22 @@ public class KafkaComponentsFactory {
 
 	private ProducerSettings<Object, Object> createProducerSettings() {
 		KafkaAvroSerializer keySerializer = new KafkaAvroSerializer(schemaRegistry);
-		keySerializer.configure(Collections.singletonMap("schema.registry.url", "http://fake-url"), true);
+		
+		Map<String,String> map = new ConcurrentHashMap<String, String>();		
+		map.put("schema.registry.url", "http://fake-url");
+		map.put("max.schemas.per.subject", String.valueOf(Integer.MAX_VALUE));		
+		keySerializer.configure(map, true);
+		
 		return ProducerSettings
                     .create(system, keySerializer, new KafkaAvroSerializer(schemaRegistry))
                     .withBootstrapServers(kafkaUrl);
 	}
-	
+
+	public KafkaProducer<Object, Object> getKafkaProducer() {
+		if (sharingSinks) {
+			return kafkaProducer;
+		} else {
+			return createProducerSettings().createKafkaProducer();
+		}
+	}
 }

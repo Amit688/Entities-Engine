@@ -1,0 +1,11 @@
+{"type": "record",
+ "name": "MergeEvent", 
+ "namespace" : "org.z.entities.schema",
+ "doc": "This is a schema for merge entities event",  
+ "fields":
+[{"name": "metadata", "type":"string", "default":""},
+{"name": "mergedEntitiesId", "type":
+						{"type": "array",
+ 	                      "items": {
+						  "name": "entityId",
+    						"type": "string"}}}]}
